@@ -141,6 +141,7 @@ export interface Reallocation {
 
 export interface Expense {
   id: string
+  activityCode?: string
   lineId: string
   projectId: string
   officeId: string
@@ -241,6 +242,26 @@ export interface Staff {
   title: Bi
 }
 
+export type ActivityType = 'medical_day' | 'clinic' | 'distribution' | 'training' | 'transport' | 'awareness' | 'other'
+
+export interface FieldReport {
+  no: string
+  submittedAt: string
+  doneOn?: string
+  beneficiaries: number
+  men?: number
+  women?: number
+  children?: number
+  summary: Bi
+  issues?: string
+  actualUSD?: number
+  photos?: string[] // data URLs (compressed)
+  lat?: number
+  lon?: number
+  submittedBy?: string
+  via?: 'online' | 'offline' | 'excel'
+}
+
 export interface FieldActivity {
   id: string
   code: string
@@ -248,8 +269,20 @@ export interface FieldActivity {
   projectId: string
   lineId: string
   title: Bi
-  date: string
-  report?: { no: string; submittedAt: string; beneficiaries: number; summary: Bi }
+  date: string // planned date
+  type?: ActivityType
+  location?: string
+  plannedUSD?: number
+  createdBy?: string
+  inKind?: boolean // funded with in-kind supplies only — no cash spending expected
+  report?: FieldReport
+}
+
+export interface OutboxItem {
+  id: string
+  activityId: string
+  report: FieldReport
+  savedAt: string
 }
 
 export interface SettlementItem {

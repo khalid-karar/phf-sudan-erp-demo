@@ -154,65 +154,74 @@ export const staff: Staff[] = [
   { id: 's-obd', name: { ar: 'نفيسة إبراهيم آدم', en: 'Nafisa Ibrahim Adam' }, officeId: 'obd', title: { ar: 'مسؤولة ميدانية', en: 'Field officer' } },
 ]
 
+type Rep = [string, number, number, number, number, string, string]
+const act = (
+  id: string,
+  code: string,
+  officeId: string,
+  projectId: string,
+  lineId: string,
+  type: FieldActivity['type'],
+  ar: string,
+  en: string,
+  day: number,
+  location: string,
+  plannedUSD: number,
+  rep?: Rep, // [no, submitted day, men, women, children, summary ar, summary en]
+): FieldActivity => ({
+  id,
+  code,
+  officeId,
+  projectId,
+  lineId,
+  type,
+  title: { ar, en },
+  date: daysFromNow(day),
+  location,
+  plannedUSD,
+  createdBy: 'u-fo',
+  report: rep
+    ? {
+        no: rep[0],
+        submittedAt: daysFromNow(rep[1]),
+        doneOn: daysFromNow(day),
+        men: rep[2],
+        women: rep[3],
+        children: rep[4],
+        beneficiaries: rep[2] + rep[3] + rep[4],
+        summary: { ar: rep[5], en: rep[6] },
+        via: 'online',
+        submittedBy: officeId === 'ksl' ? 'u-fo' : officeId === 'fsh' ? 'u-fo2' : 'u-sup',
+      }
+    : undefined,
+})
+
 export const fieldActivities: FieldActivity[] = [
-  {
-    id: 'act-128',
-    code: 'ACT-KSL-0128',
-    officeId: 'ksl',
-    projectId: 'pa',
-    lineId: 'pa-p1-l1',
-    title: { ar: 'يوم علاجي متنقل — قرية أروما', en: 'Mobile medical day — Aroma village' },
-    date: daysFromNow(-9),
-    report: { no: 'TR-KSL-0128', submittedAt: daysFromNow(-6), beneficiaries: 312, summary: { ar: 'كشف وعلاج 312 مريضاً، تحويل 9 حالات للمستشفى', en: '312 patients seen and treated, 9 cases referred' } },
-  },
-  {
-    id: 'act-131',
-    code: 'ACT-KSL-0131',
-    officeId: 'ksl',
-    projectId: 'pa',
-    lineId: 'pa-p1-l4',
-    title: { ar: 'عيادة الأمومة والطفولة — ود الحليو', en: 'Maternal & child clinic — Wad Elhilew' },
-    date: daysFromNow(-3),
-  },
-  {
-    id: 'act-081',
-    code: 'ACT-GDF-0081',
-    officeId: 'gdf',
-    projectId: 'pa',
-    lineId: 'pa-p2-l2',
-    title: { ar: 'توزيع مضادات حيوية — مركز القضارف', en: 'Antibiotics distribution — Gedaref centre' },
-    date: daysFromNow(-15),
-    report: { no: 'TR-GDF-0081', submittedAt: daysFromNow(-4), beneficiaries: 540, summary: { ar: 'صرف علاج لـ 540 مريضاً', en: 'Treatment dispensed to 540 patients' } },
-  },
-  {
-    id: 'act-027',
-    code: 'ACT-FSH-0027',
-    officeId: 'fsh',
-    projectId: 'pb',
-    lineId: 'pb-p1-l3',
-    title: { ar: 'نقل شحنة مكملات غذائية إلى معسكر أبوشوك', en: 'Supplement shipment to Abu Shouk camp' },
-    date: daysFromNow(-24),
-  },
-  {
-    id: 'act-044',
-    code: 'ACT-PTS-0044',
-    officeId: 'pts',
-    projectId: 'pa',
-    lineId: 'pa-p3-l3',
-    title: { ar: 'ورشة إسعافات أولية — بورتسودان', en: 'First aid workshop — Port Sudan' },
-    date: daysFromNow(-38),
-    report: { no: 'TR-PTS-0044', submittedAt: daysFromNow(-33), beneficiaries: 28, summary: { ar: 'تدريب 28 متطوعاً', en: '28 volunteers trained' } },
-  },
-  {
-    id: 'act-142',
-    code: 'ACT-KSL-0142',
-    officeId: 'ksl',
-    projectId: 'pa',
-    lineId: 'pa-p1-l1',
-    title: { ar: 'يوم علاجي متنقل — قرية ود شريفي', en: 'Mobile medical day — Wad Sharifey village' },
-    date: daysFromNow(4),
-  },
+  act('act-128', 'ACT-KSL-0128', 'ksl', 'pa', 'pa-p1-l1', 'medical_day', 'يوم علاجي متنقل — قرية أروما', 'Mobile medical day — Aroma village', -9, 'أروما', 1200, ['TR-KSL-0128', -6, 96, 131, 85, 'كشف وعلاج 312 مريضاً، تحويل 9 حالات للمستشفى', '312 patients seen and treated, 9 cases referred']),
+  act('act-131', 'ACT-KSL-0131', 'ksl', 'pa', 'pa-p1-l4', 'clinic', 'عيادة الأمومة والطفولة — ود الحليو', 'Maternal & child clinic — Wad Elhilew', -3, 'ود الحليو', 650),
+  act('act-135', 'ACT-KSL-0135', 'ksl', 'pa', 'pa-p1-l4', 'clinic', 'عيادة صحة الأم والطفل المتنقلة — حي الختمية', 'Mobile mother & child clinic — Khatmiya', -34, 'كسلا — الختمية', 720, ['TR-KSL-0135', -32, 0, 164, 210, 'متابعة 164 حاملاً وفحص 210 أطفال', '164 pregnant women followed up, 210 children examined']),
+  act('act-081', 'ACT-GDF-0081', 'gdf', 'pa', 'pa-p2-l2', 'distribution', 'توزيع مضادات حيوية — مركز القضارف', 'Antibiotics distribution — Gedaref centre', -15, 'القضارف', 800, ['TR-GDF-0081', -4, 201, 248, 91, 'صرف علاج لـ 540 مريضاً', 'Treatment dispensed to 540 patients']),
+  act('act-084', 'ACT-GDF-0084', 'gdf', 'pa', 'pa-p1-l1', 'medical_day', 'يوم علاجي — القلابات', 'Medical day — Gallabat', -12, 'القلابات', 900, ['TR-GDF-0084', -10, 88, 120, 77, 'كشف 285 مريضاً وصرف أدوية', '285 patients examined, medicines dispensed']),
+  act('act-088', 'ACT-GDF-0088', 'gdf', 'pa', 'pa-p3-l2', 'training', 'دورة القابلات — القضارف', 'Midwife course — Gedaref', 6, 'القضارف', 700),
+  act('act-027', 'ACT-FSH-0027', 'fsh', 'pb', 'pb-p1-l3', 'transport', 'نقل شحنة مكملات غذائية إلى معسكر أبوشوك', 'Supplement shipment to Abu Shouk camp', -24, 'معسكر أبوشوك', 2400),
+  act('act-030', 'ACT-FSH-0030', 'fsh', 'pb', 'pb-p2-l1', 'clinic', 'فحص سوء التغذية — معسكر زمزم', 'Malnutrition screening — Zamzam camp', -6, 'معسكر زمزم', 600),
+  act('act-044', 'ACT-PTS-0044', 'pts', 'pa', 'pa-p3-l3', 'training', 'ورشة إسعافات أولية — بورتسودان', 'First aid workshop — Port Sudan', -38, 'بورتسودان', 600, ['TR-PTS-0044', -33, 17, 11, 0, 'تدريب 28 متطوعاً', '28 volunteers trained']),
+  act('act-047', 'ACT-PTS-0047', 'pts', 'pa', 'pa-p2-l7', 'awareness', 'حملة تطعيم وتوعية بالكوليرا — حي سلبونا', 'Cholera vaccination & awareness — Salabona', -16, 'بورتسودان — سلبونا', 437, ['TR-PTS-0047', -15, 140, 190, 260, 'تطعيم 590 شخصاً وتوزيع أقراص تنقية مياه', '590 people vaccinated, water purification tablets handed out']),
+  act('act-019', 'ACT-OBD-0019', 'obd', 'pb', 'pb-p2-l1', 'clinic', 'عيادة تغذية — الأبيض', 'Nutrition clinic — El Obeid', -10, 'الأبيض', 450, ['TR-OBD-0019', -9, 0, 38, 126, 'فحص 126 طفلاً، 14 حالة سوء تغذية حاد', '126 children screened, 14 severe cases']),
+  act('act-142', 'ACT-KSL-0142', 'ksl', 'pa', 'pa-p1-l1', 'medical_day', 'يوم علاجي متنقل — قرية ود شريفي', 'Mobile medical day — Wad Sharifey village', 4, 'ود شريفي', 1840),
+  act('act-144', 'ACT-KSL-0144', 'ksl', 'pa', 'pa-p3-l10', 'awareness', 'توعية صحية بالمدارس — كسلا', 'School health awareness — Kassala', 10, 'كسلا', 250),
+  act('act-139', 'ACT-KSL-0139', 'ksl', 'pa', 'pa-p1-l7', 'medical_day', 'حوافز الطاقم — يوم ود الحليو العلاجي', 'Staff incentives — Wad Elhilew day', 2, 'ود الحليو', 380),
 ]
+
+export const activityTypes: Record<NonNullable<FieldActivity['type']>, { ar: string; en: string }> = {
+  medical_day: { ar: 'يوم علاجي', en: 'Medical day' },
+  clinic: { ar: 'عيادة', en: 'Clinic' },
+  distribution: { ar: 'توزيع', en: 'Distribution' },
+  training: { ar: 'تدريب', en: 'Training' },
+  transport: { ar: 'نقل', en: 'Transport' },
+  awareness: { ar: 'توعية', en: 'Awareness' },
+  other: { ar: 'أخرى', en: 'Other' },
+}
 
 // ---------------------------------------------------------------------------
 // Ledger generated from the operational seed, so every report ties out.
@@ -386,7 +395,7 @@ export function buildFinance(expenses: Expense[], lineMap: Record<string, string
     ],
     'ADV-0015',
   )
-  extraExpenses.push({ id: 'ex-adv-0015', lineId: 'pa-p3-l3', projectId: 'pa', officeId: 'pts', amountUSD: 560, date: sAt, hasTechReport: true })
+  extraExpenses.push({ id: 'ex-adv-0015', activityCode: 'ACT-PTS-0044', lineId: 'pa-p3-l3', projectId: 'pa', officeId: 'pts', amountUSD: 560, date: sAt, hasTechReport: true })
 
   journal.sort((a, b) => +new Date(a.date) - +new Date(b.date))
 

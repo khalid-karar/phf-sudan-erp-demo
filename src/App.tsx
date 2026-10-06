@@ -1,6 +1,10 @@
 import { HashRouter, Route, Routes } from 'react-router-dom'
 import { Guard } from './components/Guard'
 import { Layout } from './components/Layout'
+import { Activities, ActivityDetail } from './pages/activities/Activities'
+import { FieldReport } from './pages/activities/FieldReport'
+import { ImportExcel } from './pages/activities/ImportExcel'
+import { Reconciliation } from './pages/activities/Reconciliation'
 import { Approvals } from './pages/Approvals'
 import { Dashboard } from './pages/Dashboard'
 import { Accounts } from './pages/finance/Accounts'
@@ -30,6 +34,11 @@ const routes: [string, React.ReactNode][] = [
   ['/requests/new', <NewRequest />],
   ['/requests/:id', <RequestDetail />],
   ['/approvals', <Approvals />],
+  ['/activities', <Activities />],
+  ['/activities/report', <FieldReport />],
+  ['/activities/import', <ImportExcel />],
+  ['/activities/:id', <ActivityDetail />],
+  ['/reconciliation', <Reconciliation />],
   ['/finance', <FinanceOverview />],
   ['/finance/accounts', <Accounts />],
   ['/finance/vouchers', <Vouchers />],

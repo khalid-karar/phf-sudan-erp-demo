@@ -25,6 +25,7 @@ export function NewRequest() {
   const SDG_RATE = s.rates[s.rates.length - 1].rate
   const perm = usePerm()
 
+  const fromActOffice = s.activities.find((x) => x.code === params.get('activity'))?.officeId
   const [projectId, setProjectId] = useState(params.get('project') ?? s.projects[0].id)
   const project = s.projects.find((p) => p.id === projectId)!
   const lineParam = params.get('line')
@@ -34,11 +35,12 @@ export function NewRequest() {
   const [lineId, setLineId] = useState(lineParam ?? pillar.lines[0].id)
   const line = pillar.lines.find((l) => l.id === lineId) ?? pillar.lines[0]
 
-  const [officeId, setOfficeId] = useState(user.officeId === 'khr' ? 'ksl' : user.officeId)
-  const [currency, setCurrency] = useState<'SDG' | 'USD'>('SDG')
-  const [amount, setAmount] = useState<number | ''>('')
-  const [purpose, setPurpose] = useState('')
-  const [activity, setActivity] = useState('')
+  const [officeId, setOfficeId] = useState(fromActOffice ?? (user.officeId === 'khr' ? 'ksl' : user.officeId))
+  const fromAct = s.activities.find((x) => x.code === params.get('activity'))
+  const [currency, setCurrency] = useState<'SDG' | 'USD'>(params.get('amount') ? 'USD' : 'SDG')
+  const [amount, setAmount] = useState<number | ''>(params.get('amount') ? +params.get('amount')! || '' : '')
+  const [purpose, setPurpose] = useState(fromAct ? fromAct.title[lang] : '')
+  const [activity, setActivity] = useState(params.get('activity') ?? '')
   const [realloc, setRealloc] = useState(false)
 
   useEffect(() => {
@@ -189,7 +191,16 @@ export function NewRequest() {
             label={ar ? 'رقم النشاط' : 'Activity number'}
             hint={ar ? 'يربط هذا الصرف بالتقرير الفني للنشاط نفسه — أساس المطابقة.' : 'Links this spend to the same activity’s field report — the basis of matching.'}
           >
-            <input className={`${inputCls} num`} value={activity} onChange={(e) => setActivity(e.target.value)} placeholder="ACT-KSL-0142" dir="ltr" />
+            <input className={`${inputCls} num`} value={activity} onChange={(e) => setActivity(e.target.value)} placeholder="ACT-KSL-0142" dir="ltr" list="acts" />
+            <datalist id="acts">
+              {s.activities
+                .filter((x) => x.officeId === officeId)
+                .map((x) => (
+                  <option key={x.id} value={x.code}>
+                    {x.title[lang]}
+                  </option>
+                ))}
+            </datalist>
           </Field>
         </Panel>
 

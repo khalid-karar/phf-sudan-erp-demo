@@ -1,7 +1,7 @@
 import { AlertTriangle, BellRing, CheckCircle2, Clock, FileCheck2, FileX2, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button, Modal, PageHeader, Panel } from '../../components/ui'
-import { fieldActivities, staff } from '../../data/finance'
+import { staff } from '../../data/finance'
 import type { Advance, SettlementItem } from '../../data/types'
 import { findLine } from '../../lib/budget'
 import { date, daysUntil, relDays, usd } from '../../lib/format'
@@ -9,7 +9,8 @@ import { useLang } from '../../lib/i18n'
 import { getOffices, usePerm, useStore, useUser } from '../../lib/store'
 import { useAccountName } from './common'
 
-export const activityFor = (code: string) => fieldActivities.find((a) => a.code === code)
+/** Live lookup of an activity by its code. */
+export const activityFor = (code: string) => useStore.getState().activities.find((a) => a.code === code)
 
 export function Advances() {
   const lang = useLang()

@@ -12,10 +12,14 @@ import {
   defaultLineMap,
   FX_GAIN,
   FX_LOSS,
+  fieldActivities as seedActivities,
   rates as seedRates,
   staff,
 } from '../data/finance'
 import type {
+  FieldActivity,
+  FieldReport,
+  OutboxItem,
   Access,
   ModuleKey,
   Office,
@@ -58,6 +62,17 @@ interface State {
   users: User[]
   roles: Role[]
   sidebarCollapsed: boolean
+  activities: FieldActivity[]
+  outbox: OutboxItem[]
+  offlineSim: boolean
+
+  saveActivity: (a: FieldActivity) => void
+  submitReport: (activityId: string, report: FieldReport) => 'sent' | 'queued'
+  setOfflineSim: (v: boolean) => void
+  syncOutbox: () => void
+  linkExpense: (expenseId: string, activityCode: string) => void
+  importReports: (rows: { activityId: string; report: FieldReport }[]) => void
+  gapCount: () => number
 
   setOrg: (patch: Partial<OrgSettings>) => void
   saveOffice: (o: Office) => void
@@ -125,6 +140,8 @@ const fresh = () => {
   const lineMap = defaultLineMap()
   const f = buildFinance(s.expenses, lineMap)
   return {
+    activities: structuredClone(seedActivities),
+    outbox: [] as OutboxItem[],
     org: structuredClone(orgDefaults),
     offices: structuredClone(seedOffices),
     users: structuredClone(seedUsers),
@@ -138,7 +155,9 @@ const fresh = () => {
     closes: f.closes,
     fseq: { je: f.journal.length + 1, pv: f.nextPv, rv: f.nextRv, adv: 22 },
     projects: structuredClone(seedProjects),
-    expenses: [...f.extraExpenses, ...s.expenses],
+    expenses: [...f.extraExpenses, ...s.expenses].map((e) =>
+      e.id === 'ex-4-0' ? { ...e, activityCode: 'ACT-KSL-0135' } : e.id === 'ex-17-1' ? { ...e, activityCode: 'ACT-PTS-0047' } : e,
+    ),
     requests: s.requests,
     reallocations: s.reallocations,
     rules: s.rules,
@@ -194,6 +213,42 @@ const decide = (steps: ApprovalStep[], userId: string, approve: boolean, note?: 
   return { steps: next, done: true, approved: true }
 }
 
+type SetFn = (p: Partial<State> | ((s: State) => Partial<State>)) => void
+
+/** Attaches a field report to its activity and marks the activity's spending as matched. */
+function applyReport(set: SetFn, get: () => State, activityId: string, report: FieldReport, quiet = false) {
+  const s = get()
+  const a = s.activities.find((x) => x.id === activityId)
+  if (!a) return
+  const no = report.no || `TR-${a.code.slice(4)}`
+  set({
+    activities: s.activities.map((x) => (x.id === activityId ? { ...x, report: { ...report, no, submittedBy: report.submittedBy ?? s.userId } } : x)),
+    expenses: s.expenses.map((e) => (e.activityCode === a.code ? { ...e, hasTechReport: true } : e)),
+  })
+  if (!quiet) get().toast({ ar: `أُرسل التقرير الفني ${no} وارتبط بالنشاط ${a.code}`, en: `Field report ${no} sent and linked to ${a.code}` })
+}
+
+export type Gap =
+  | { kind: 'spend_no_report'; id: string; officeId: string; amountUSD: number; date: string; lineId: string; expenseId: string }
+  | { kind: 'report_overdue'; id: string; officeId: string; amountUSD: number; date: string; lineId: string; activityId: string }
+  | { kind: 'report_no_spend'; id: string; officeId: string; amountUSD: number; date: string; lineId: string; activityId: string }
+
+/** Places where the technical and financial sides don't line up yet. A report is due 5 days after the activity. */
+export function matchingGaps(s: Pick<State, 'expenses' | 'activities' | 'advances' | 'requests'>): Gap[] {
+  const gaps: Gap[] = []
+  const now = Date.now()
+  for (const e of s.expenses)
+    if (!e.hasTechReport) gaps.push({ kind: 'spend_no_report', id: `g-${e.id}`, officeId: e.officeId, amountUSD: e.amountUSD, date: e.date, lineId: e.lineId, expenseId: e.id })
+  for (const a of s.activities) {
+    const funded =
+      s.advances.some((x) => x.activityCode === a.code) || s.requests.some((r) => r.activityCode === a.code && r.status !== 'rejected') || s.expenses.some((e) => e.activityCode === a.code)
+    if (!a.report && +new Date(a.date) + 5 * 86_400_000 < now)
+      gaps.push({ kind: 'report_overdue', id: `g-${a.id}`, officeId: a.officeId, amountUSD: a.plannedUSD ?? 0, date: a.date, lineId: a.lineId, activityId: a.id })
+    if (a.report && !funded && !a.inKind) gaps.push({ kind: 'report_no_spend', id: `g-ns-${a.id}`, officeId: a.officeId, amountUSD: a.plannedUSD ?? 0, date: a.report.submittedAt, lineId: a.lineId, activityId: a.id })
+  }
+  return gaps
+}
+
 export const useStore = create<State>()(
   persist(
   (set, get) => ({
@@ -201,7 +256,46 @@ export const useStore = create<State>()(
   userId: 'u-fo',
   toasts: [],
   sidebarCollapsed: false,
+  offlineSim: false,
   ...fresh(),
+
+  saveActivity: (a) => {
+    const s = get()
+    const exists = s.activities.some((x) => x.id === a.id)
+    set({ activities: exists ? s.activities.map((x) => (x.id === a.id ? a : x)) : [a, ...s.activities] })
+    get().toast(exists ? { ar: `حُفظ النشاط ${a.code}`, en: `${a.code} saved` } : { ar: `أُنشئ النشاط ${a.code}`, en: `${a.code} created` })
+  },
+  submitReport: (activityId, report) => {
+    const s = get()
+    const offline = s.offlineSim || (typeof navigator !== 'undefined' && navigator.onLine === false)
+    if (offline) {
+      set({ outbox: [...s.outbox, { id: `ob-${Date.now()}`, activityId, report: { ...report, via: 'offline' }, savedAt: new Date().toISOString() }] })
+      get().toast({ ar: 'لا يوجد اتصال — حُفظ التقرير على الجهاز وسيُرسل تلقائياً عند عودة الإنترنت', en: 'No connection — report saved on this device and will send when back online' }, 'warn')
+      return 'queued'
+    }
+    applyReport(set, get, activityId, report)
+    return 'sent'
+  },
+  setOfflineSim: (v) => {
+    set({ offlineSim: v })
+    if (!v && get().outbox.length) get().syncOutbox()
+  },
+  syncOutbox: () => {
+    const items = get().outbox
+    if (!items.length) return
+    for (const it of items) applyReport(set, get, it.activityId, it.report, true)
+    set({ outbox: [] })
+    get().toast({ ar: `عاد الاتصال — أُرسل ${items.length} تقرير محفوظ`, en: `Back online — ${items.length} saved report(s) sent` })
+  },
+  linkExpense: (expenseId, activityCode) => {
+    set((s) => ({ expenses: s.expenses.map((e) => (e.id === expenseId ? { ...e, activityCode, hasTechReport: true } : e)) }))
+    get().toast({ ar: `رُبط المصروف بالنشاط ${activityCode}`, en: `Expense linked to ${activityCode}` })
+  },
+  importReports: (rows) => {
+    for (const r of rows) applyReport(set, get, r.activityId, { ...r.report, via: 'excel' }, true)
+    get().toast({ ar: `استُورد ${rows.length} تقرير من ملف Excel`, en: `${rows.length} report(s) imported from Excel` })
+  },
+  gapCount: () => matchingGaps(get()).length,
 
   setOrg: (patch) => {
     set((s) => ({ org: { ...s.org, ...patch } }))
@@ -400,7 +494,7 @@ export const useStore = create<State>()(
       debit = { account: ADVANCES, debit: req.amountUSD, credit: 0, ...dims }
       memo = { ar: `صرف عهدة ${no} — ${req.code}`, en: `Advance ${no} — ${req.code}` }
     } else {
-      expense = { id: `ex-${req.id}`, requestId: req.id, amountUSD: req.amountUSD, date: now, hasTechReport: false, ...dims }
+      expense = { id: `ex-${req.id}`, requestId: req.id, activityCode: req.activityCode, amountUSD: req.amountUSD, date: now, hasTechReport: !!s.activities.find((x) => x.code === req.activityCode)?.report, ...dims }
       debit = { account: s.lineMap[req.lineId], debit: req.amountUSD, credit: 0, ...dims }
       memo = { ar: `${req.code} — ${line.code} ${line.name.ar}`, en: `${req.code} — ${line.code} ${line.name.en}` }
     }
@@ -500,7 +594,7 @@ export const useStore = create<State>()(
       ref: a.no,
       lines,
     }
-    const expense: Expense = { id: `ex-${a.id}`, amountUSD: spent, date: now, hasTechReport: true, ...dims }
+    const expense: Expense = { id: `ex-${a.id}`, activityCode: a.activityCode, amountUSD: spent, date: now, hasTechReport: true, ...dims }
     set({
       advances: s.advances.map((x) => (x.id === id ? { ...x, status: 'settled', settlement: { at: now, items, returnedUSD: returned, reimbursedUSD: reimbursed, reportNo } } : x)),
       journal: [...s.journal, je],
@@ -578,7 +672,7 @@ export const useStore = create<State>()(
     set((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, controlMode: mode, tolerancePct } : p)) })),
   }),
   {
-    name: 'phf-erp-demo-v3',
+    name: 'phf-erp-demo-v4',
     storage: createJSONStorage(() => safeStorage),
     partialize: (s) => {
       const { toasts: _t, ...rest } = s
