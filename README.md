@@ -1,32 +1,52 @@
-# React + TypeScript + Vite
+# PHF Sudan — Resource Management System (demo)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Clickable frontend demo of an ERP for the Kuwait Patients Helping Fund (Sudan): HQ in Khartoum plus 11 offices.
+Everything runs in the browser on sample data; there is no backend yet. **Reset demo** in the top bar restores the starting data.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # static site in dist/ (Netlify uses netlify.toml)
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## What milestone 1 covers
+
+| Screen | Shows |
+|---|---|
+| Dashboard | Both funding streams (cash support to Finance, in-kind replenishment to Supply Chain), Sudan map with matching status per office, items needing action, project burn |
+| Projects & budgets | Project, pillar and line tree; ceiling, spent, committed, in approval and available on every line; hard-stop or tolerance mode per project |
+| New spend request | Live ceiling check on the line, pillar and project; blocked or extra-approval verdict; predicted approval route |
+| Reallocation | Move money between lines with its own approval route; ceilings update once approved |
+| Awaiting my approval | Queue for the current role; approve or reject with a note |
+| Approval rules | Edit amount bands, office scope and approver order; gap/overlap warnings; rule tester |
+
+Amounts in approval are reserved on the line, so two pending requests cannot both pass over a ceiling.
+
+## Demo script (about 10 minutes)
+
+Use the role switcher (top corner) to play every role.
+
+1. **Dashboard** as the Finance & Admin Manager: the two funding streams, the map (El Fasher, Gedaref and Port Sudan show gaps between field reports and spending), and the action list.
+2. **Projects → Project A**: 4 pillars × 10 lines, each with a ceiling. Open pillar 1: line 1.1 *Mobile medical days* has only $1,000 left.
+3. Switch to the **Field officer (Kassala)** → **New spend request** → *Fill demo example* (4,500,000 SDG on line 1.1). The system **blocks it**: the line is $837 short.
+4. Click **Request reallocation**. The system suggests a line in the same pillar with room to give. Send it.
+5. Switch to the **Finance Manager** → *Awaiting my approval* → approve the reallocation. Switch to the **Executive Director** → approve. The line ceiling is updated.
+6. Back as the **Field officer** → New request → *Fill demo example* → now **within the ceiling** → send.
+7. **Supervisor** approves, then the **Finance Manager** approves and records payment. The amount moves from committed to spent and waits for its field report.
+8. **Approval rules** as the Finance Manager: change the 500 USD threshold live, add the Executive Director to a band, or create a Kassala-only rule. Use the tester to show the new route.
+9. Optional: on **Project B**, switch to *tolerance* mode to show an over-ceiling request going to the Executive Director instead of being blocked.
+
+## Next milestones
+
+- Activities and offline field reports (mobile), technical–financial matching screen
+- Excel template download/upload with validation preview
+- Alerts and deadlines calendar, donor report
+- Supply chain, logistics, HR, beneficiaries
+
+## Notes
+
+- Exchange rate is a fixed demo value (2,450 SDG per USD); the real system keeps a dated rate log.
+- Project names, donors, staff names and figures are sample data.
+- Fonts are bundled locally (no Google Fonts) so the app works on weak connections.

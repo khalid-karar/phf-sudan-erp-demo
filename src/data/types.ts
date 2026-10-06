@@ -124,6 +124,7 @@ export interface ApprovalRule {
   minUSD: number
   maxUSD: number | null // null = no upper limit
   appliesTo: 'spend' | 'reallocation'
+  officeId: string | null // null = all offices; an office-specific rule wins over a general one
   chain: RoleKey[]
   active: boolean
 }
