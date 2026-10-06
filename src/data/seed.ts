@@ -178,10 +178,10 @@ export const projects: Project[] = [
 // For each line: [spent %, committed %]. Tuned so the demo has a story:
 // line 1.1 is nearly exhausted, 1.9 has room to give, a few lines are near their ceiling.
 const usage: Record<string, [number, number]> = {
-  'pa-p1-l1': [0.65, 0.225], // 8000 → spent 5200, committed 1800, available 1000
+  'pa-p1-l1': [0.65, 0.075], // 8000 → spent 5200, committed 600 + open advance 1200, available 1000
   'pa-p1-l2': [0.52, 0.1],
   'pa-p1-l3': [0.4, 0.05],
-  'pa-p1-l4': [0.48, 0.12],
+  'pa-p1-l4': [0.48, 0],
   'pa-p1-l5': [0.7, 0.18],
   'pa-p1-l6': [0.35, 0],
   'pa-p1-l7': [0.5, 0.1],
@@ -189,7 +189,7 @@ const usage: Record<string, [number, number]> = {
   'pa-p1-l9': [0.2, 0.05],
   'pa-p1-l10': [0.1, 0],
   'pa-p2-l1': [0.62, 0.12],
-  'pa-p2-l2': [0.55, 0.2],
+  'pa-p2-l2': [0.55, 0],
   'pa-p2-l3': [0.4, 0.1],
   'pa-p2-l4': [0.6, 0.15],
   'pa-p2-l5': [0.3, 0.1],
@@ -214,7 +214,7 @@ const usage: Record<string, [number, number]> = {
   'pa-p4-l9': [0.4, 0],
   'pb-p1-l1': [0.58, 0.2],
   'pb-p1-l2': [0.45, 0.15],
-  'pb-p1-l3': [0.5, 0.1],
+  'pb-p1-l3': [0.4, 0],
   'pb-p1-l4': [0.33, 0],
   'pb-p2-l1': [0.4, 0.1],
   'pb-p2-l2': [0.38, 0.12],

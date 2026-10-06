@@ -1,4 +1,12 @@
 import {
+  ArrowLeftRight,
+  BookOpen,
+  CalendarCheck,
+  FileSpreadsheet,
+  HandCoins,
+  Landmark,
+  PieChart,
+  Receipt,
   BarChart3,
   Bell,
   Boxes,
@@ -32,7 +40,7 @@ function useMyQueueCount() {
   return requests.filter((r) => r.status === 'pending' && mine(r.steps)).length + reallocs.filter((r) => r.status === 'pending' && mine(r.steps)).length
 }
 
-type Item = { to: string; key: DictKey; icon: ReactNode; badge?: number; soon?: boolean }
+type Item = { to: string; key: DictKey; icon: ReactNode; badge?: number; badgeTone?: 'quiet'; soon?: boolean }
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const t = useT()
@@ -53,13 +61,25 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     { to: '/alerts', key: 'nav_alerts', icon: <Bell size={18} />, soon: true },
     { to: '/reports', key: 'nav_reports', icon: <BarChart3 size={18} />, soon: true },
   ]
+  const awaitingPay = useStore((st) => st.requests.filter((r) => r.status === 'approved').length)
+  const overdueAdv = useStore((st) => st.advances.filter((a) => a.status === 'open' && +new Date(a.dueAt) < Date.now()).length)
+  const finance: Item[] = [
+    { to: '/finance', key: 'nav_fin_overview', icon: <PieChart size={18} /> },
+    { to: '/finance/accounts', key: 'nav_fin_accounts', icon: <BookOpen size={18} /> },
+    { to: '/finance/vouchers', key: 'nav_fin_vouchers', icon: <Receipt size={18} />, badge: awaitingPay, badgeTone: 'quiet' },
+    { to: '/finance/advances', key: 'nav_fin_advances', icon: <HandCoins size={18} />, badge: overdueAdv },
+    { to: '/finance/journal', key: 'nav_fin_journal', icon: <FileSpreadsheet size={18} /> },
+    { to: '/finance/rates', key: 'nav_fin_rates', icon: <ArrowLeftRight size={18} /> },
+    { to: '/finance/close', key: 'nav_fin_close', icon: <CalendarCheck size={18} /> },
+    { to: '/finance/reports', key: 'nav_fin_reports', icon: <Landmark size={18} /> },
+  ]
   const settings: Item[] = [{ to: '/settings/approval-rules', key: 'nav_rules', icon: <Settings2 size={18} /> }]
 
   const link = (i: Item) => (
     <NavLink
       key={i.to}
       to={i.to}
-      end={i.to === '/'}
+      end={i.to === '/' || i.to === '/finance'}
       onClick={onNavigate}
       className={({ isActive }) =>
         `flex items-center gap-3 rounded-md px-3 py-2 text-[14px] transition-colors ${
@@ -69,7 +89,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     >
       <span className="shrink-0">{i.icon}</span>
       <span className="flex-1 truncate">{t(i.key)}</span>
-      {!!i.badge && <span className="num rounded-full bg-crescent px-2 text-[12px] font-semibold leading-5 text-white">{i.badge}</span>}
+      {!!i.badge && (
+        <span className={`num rounded-full px-2 text-[12px] font-semibold leading-5 ${i.badgeTone === 'quiet' ? 'bg-white/15 text-white' : 'bg-crescent text-white'}`}>{i.badge}</span>
+      )}
     </NavLink>
   )
   const group = (label: DictKey, items: Item[]) => (
@@ -90,6 +112,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
       <div className="flex-1 overflow-y-auto">
         {group('nav_group_ops', ops)}
+        {group('nav_group_finance', finance)}
         {group('nav_group_next', next)}
         {group('nav_group_settings', settings)}
       </div>

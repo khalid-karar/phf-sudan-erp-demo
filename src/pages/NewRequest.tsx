@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ReallocationModal } from '../components/ReallocationModal'
 import { Button, Field, inputCls, PageHeader, Panel, UsageBar } from '../components/ui'
-import { offices, roleNames, SDG_RATE } from '../data/seed'
+import { offices, roleNames } from '../data/seed'
 import { checkCeiling, routeApproval, type Level } from '../lib/budget'
 import { num, sdg, usd } from '../lib/format'
 import { useLang } from '../lib/i18n'
@@ -22,6 +22,7 @@ export function NewRequest() {
   const user = useUser()
   const nav = useNavigate()
   const [params] = useSearchParams()
+  const SDG_RATE = s.rates[s.rates.length - 1].rate
 
   const [projectId, setProjectId] = useState(params.get('project') ?? s.projects[0].id)
   const project = s.projects.find((p) => p.id === projectId)!
@@ -148,8 +149,8 @@ export function NewRequest() {
               hint={
                 currency === 'SDG' && amountUSD > 0
                   ? ar
-                    ? `≈ ${usd(amountUSD)} بسعر ${num(SDG_RATE)} ج.س للدولار (سعر العرض)`
-                    : `≈ ${usd(amountUSD)} at ${num(SDG_RATE)} SDG per USD (demo rate)`
+                    ? `≈ ${usd(amountUSD)} بسعر ${num(SDG_RATE)} ج.س للدولار (سعر اليوم)`
+                    : `≈ ${usd(amountUSD)} at ${num(SDG_RATE)} SDG per USD (today’s rate)`
                   : currency === 'USD' && amountUSD > 0
                     ? `≈ ${sdg(amountUSD * SDG_RATE, lang)}`
                     : undefined

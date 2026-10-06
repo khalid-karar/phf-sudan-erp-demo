@@ -1,6 +1,7 @@
 import { Check, Circle, Clock, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { PayModal } from '../components/PayModal'
 import { Button, PageHeader, Panel, StatusBadge, UsageBar } from '../components/ui'
 import { offices, roleNames, users } from '../data/seed'
 import type { ApprovalStep, RequestStatus } from '../data/types'
@@ -138,6 +139,7 @@ export function RequestDetail() {
   const s = useStore()
   const user = useUser()
   const [note, setNote] = useState('')
+  const [paying, setPaying] = useState(false)
   const r = s.requests.find((x) => x.id === id)
   if (!r) return <p>{ar ? 'الطلب غير موجود' : 'Request not found'}</p>
   const f = findLine(s.projects, r.lineId)!
@@ -223,13 +225,14 @@ export function RequestDetail() {
           )}
           {canPay && (
             <Panel className="p-5">
-              <h2 className="text-[15.5px] font-semibold">{ar ? 'تسجيل الصرف' : 'Record payment'}</h2>
+              <h2 className="text-[15.5px] font-semibold">{ar ? 'صرف الطلب' : 'Pay this request'}</h2>
               <p className="mt-1 text-[13.5px] text-muted">
-                {ar ? 'ينتقل المبلغ من "محجوز" إلى "مصروف"، ويبقى مفتوحاً حتى يُرفع التقرير الفني للنشاط.' : 'Moves the amount from committed to spent; it stays open until the activity’s field report arrives.'}
+                {ar ? 'نقداً أو بنكياً أو كعهدة لموظف. يصدر سند الصرف والقيد المحاسبي تلقائياً.' : 'In cash, by bank, or as a staff advance. The voucher and journal entry are created automatically.'}
               </p>
-              <Button className="mt-3 w-full" onClick={() => s.payRequest(r.id)}>
-                {ar ? 'تسجيل الصرف' : 'Record payment'}
+              <Button className="mt-3 w-full" onClick={() => setPaying(true)}>
+                {ar ? 'صرف' : 'Pay'}
               </Button>
+              <PayModal req={r} open={paying} onClose={() => setPaying(false)} />
             </Panel>
           )}
           {r.status === 'pending' && !myTurn && (

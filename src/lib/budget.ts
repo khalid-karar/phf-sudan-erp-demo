@@ -1,4 +1,4 @@
-import type { ApprovalRule, BudgetLine, Expense, Pillar, Project, Reallocation, RoleKey, SpendRequest } from '../data/types'
+import type { Advance, ApprovalRule, BudgetLine, Expense, Pillar, Project, Reallocation, RoleKey, SpendRequest } from '../data/types'
 
 export interface Usage {
   ceiling: number // after approved reallocations
@@ -13,6 +13,7 @@ export interface BudgetData {
   expenses: Expense[]
   requests: SpendRequest[]
   reallocations: Reallocation[]
+  advances?: Advance[] // open cash advances count as committed until settled
 }
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
@@ -29,7 +30,9 @@ export function lineUsage(line: BudgetLine, d: BudgetData, excludeRequestId?: st
   const ceiling = line.ceilingUSD + reallocDelta(line.id, d)
   const spent = sum(d.expenses.filter((e) => e.lineId === line.id).map((e) => e.amountUSD))
   const reqs = d.requests.filter((r) => r.lineId === line.id && r.id !== excludeRequestId)
-  const committed = sum(reqs.filter((r) => r.status === 'approved').map((r) => r.amountUSD))
+  const committed =
+    sum(reqs.filter((r) => r.status === 'approved').map((r) => r.amountUSD)) +
+    sum((d.advances ?? []).filter((a) => a.status === 'open' && a.lineId === line.id).map((a) => a.amountUSD))
   const pendingReq = sum(reqs.filter((r) => r.status === 'pending').map((r) => r.amountUSD))
   // Money promised away by a pending reallocation is reserved on the giving line too.
   const pendingOut = sum(

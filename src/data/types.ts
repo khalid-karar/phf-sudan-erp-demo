@@ -143,3 +143,114 @@ export interface ActivityLog {
   at: string
   text: Bi
 }
+
+// --- Finance ---------------------------------------------------------------
+
+export type AccountType = 'asset' | 'liability' | 'net_assets' | 'revenue' | 'expense'
+
+export interface Account {
+  code: string
+  parent: string | null
+  name: Bi
+  type: AccountType
+  postable: boolean // headers group accounts; only postable accounts take entries
+  currency?: 'SDG' | 'USD' // cash and bank accounts hold a specific currency
+  officeId?: string
+}
+
+export interface JournalLine {
+  account: string
+  debit: number // USD
+  credit: number // USD
+  sdg?: number // original SDG amount (signed: + debit, − credit) for SDG cash/bank accounts
+  officeId?: string
+  projectId?: string
+  lineId?: string
+}
+
+export type JournalSource = 'opening' | 'payment' | 'receipt' | 'advance' | 'settlement' | 'fx' | 'transfer'
+
+export interface JournalEntry {
+  id: string
+  no: string
+  date: string
+  memo: Bi
+  source: JournalSource
+  ref?: string // voucher / advance number
+  lines: JournalLine[]
+}
+
+export type PayMethod = 'cash' | 'bank' | 'bankak' | 'advance'
+
+export interface Voucher {
+  id: string
+  no: string
+  kind: 'payment' | 'receipt'
+  date: string
+  method: PayMethod | 'transfer'
+  account: string // cash box or bank account used
+  amountUSD: number
+  currency: 'SDG' | 'USD'
+  amount: number
+  rate: number
+  party: Bi // payee or payer
+  memo: Bi
+  officeId: string
+  projectId?: string
+  lineId?: string
+  requestId?: string
+  journalId: string
+}
+
+export interface Staff {
+  id: string
+  name: Bi
+  officeId: string
+  title: Bi
+}
+
+export interface FieldActivity {
+  id: string
+  code: string
+  officeId: string
+  projectId: string
+  lineId: string
+  title: Bi
+  date: string
+  report?: { no: string; submittedAt: string; beneficiaries: number; summary: Bi }
+}
+
+export interface SettlementItem {
+  description: string
+  receiptNo: string
+  amountUSD: number
+}
+
+export interface Advance {
+  id: string
+  no: string
+  staffId: string
+  officeId: string
+  projectId: string
+  lineId: string
+  activityCode: string
+  requestId?: string
+  amountUSD: number
+  issuedAt: string
+  dueAt: string
+  status: 'open' | 'settled'
+  settlement?: { at: string; items: SettlementItem[]; returnedUSD: number; reimbursedUSD: number; reportNo: string }
+}
+
+export interface RateEntry {
+  date: string
+  rate: number // SDG per USD
+  source: Bi
+}
+
+export interface MonthClose {
+  officeId: string
+  cashCounted: boolean
+  closedAt?: string
+  closedBy?: string
+}

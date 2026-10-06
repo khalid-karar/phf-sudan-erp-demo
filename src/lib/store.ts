@@ -1,7 +1,41 @@
 import { create } from 'zustand'
-import { buildSeed, daysFromNow, projects as seedProjects, SDG_RATE, users } from '../data/seed'
-import type { ApprovalRule, ApprovalStep, Bi, ControlMode, Expense, Lang, Project, Reallocation, SpendRequest } from '../data/types'
+import { buildSeed, daysFromNow, projects as seedProjects, users } from '../data/seed'
+import {
+  accounts as seedAccounts,
+  ADVANCES,
+  BANK_PTS,
+  BANK_SDG,
+  BANK_USD,
+  buildFinance,
+  cashAccount,
+  defaultLineMap,
+  FX_GAIN,
+  FX_LOSS,
+  rates as seedRates,
+  staff,
+} from '../data/finance'
+import type {
+  Account,
+  Advance,
+  ApprovalRule,
+  ApprovalStep,
+  Bi,
+  ControlMode,
+  Expense,
+  JournalEntry,
+  JournalLine,
+  Lang,
+  MonthClose,
+  PayMethod,
+  Project,
+  RateEntry,
+  Reallocation,
+  SettlementItem,
+  SpendRequest,
+  Voucher,
+} from '../data/types'
 import { checkCeiling, findLine, routeApproval } from './budget'
+import { revaluation } from './ledger'
 
 export interface Toast {
   id: number
@@ -21,6 +55,26 @@ interface State {
   toasts: Toast[]
   seq: number
 
+  // finance
+  accounts: Account[]
+  lineMap: Record<string, string>
+  journal: JournalEntry[]
+  vouchers: Voucher[]
+  advances: Advance[]
+  rates: RateEntry[]
+  closes: MonthClose[]
+  fseq: { je: number; pv: number; rv: number; adv: number }
+
+  issuePayment: (requestId: string, method: PayMethod, staffId?: string) => void
+  recordReceipt: (d: { projectId?: string; amountUSD: number; account: string; revenueAccount: string; party: string; memo: string }) => void
+  settleAdvance: (id: string, items: SettlementItem[], reportNo: string) => void
+  addAccount: (a: Account) => void
+  setLineAccount: (lineId: string, code: string) => void
+  addRate: (rate: number) => void
+  postRevaluation: () => void
+  setCashCounted: (officeId: string, v: boolean) => void
+  closeMonth: (officeId: string) => void
+
   setLang: (l: Lang) => void
   setUser: (id: string) => void
   reset: () => void
@@ -37,7 +91,6 @@ interface State {
     activityCode?: string
   }) => SpendRequest | null
   decideRequest: (id: string, approve: boolean, note?: string) => void
-  payRequest: (id: string) => void
 
   submitReallocation: (draft: { projectId: string; fromLineId: string; toLineId: string; amountUSD: number; reason: string }) => Reallocation
   decideReallocation: (id: string, approve: boolean, note?: string) => void
@@ -50,9 +103,19 @@ interface State {
 
 const fresh = () => {
   const s = buildSeed()
+  const lineMap = defaultLineMap()
+  const f = buildFinance(s.expenses, lineMap)
   return {
+    accounts: structuredClone(seedAccounts),
+    lineMap,
+    journal: f.journal,
+    vouchers: f.vouchers,
+    advances: f.advances,
+    rates: structuredClone(seedRates),
+    closes: f.closes,
+    fseq: { je: f.journal.length + 1, pv: f.nextPv, rv: f.nextRv, adv: 22 },
     projects: structuredClone(seedProjects),
-    expenses: s.expenses,
+    expenses: [...f.extraExpenses, ...s.expenses],
     requests: s.requests,
     reallocations: s.reallocations,
     rules: s.rules,
@@ -112,7 +175,8 @@ export const useStore = create<State>((set, get) => ({
     const s = get()
     const found = findLine(s.projects, draft.lineId)
     if (!found) return null
-    const amountUSD = draft.currency === 'USD' ? draft.amount : draft.amount / SDG_RATE
+    const rate = s.rates[s.rates.length - 1].rate
+    const amountUSD = draft.currency === 'USD' ? draft.amount : draft.amount / rate
     const check = checkCeiling(found.project, found.pillar, found.line, amountUSD, s)
     if (check.verdict === 'blocked') return null
     const over = check.verdict === 'needs_extra_approval'
@@ -128,7 +192,7 @@ export const useStore = create<State>((set, get) => ({
       purpose: { ar: draft.purpose, en: draft.purpose },
       amount: draft.amount,
       currency: draft.currency,
-      rate: SDG_RATE,
+      rate,
       amountUSD: Math.round(amountUSD * 100) / 100,
       requesterId: s.userId,
       createdAt: new Date().toISOString(),
@@ -157,27 +221,6 @@ export const useStore = create<State>((set, get) => ({
         : { ar: `رُفض ${req.code} وأُعيد المبلغ إلى رصيد البند`, en: `${req.code} rejected; amount released back to the line` },
       approve ? 'ok' : 'warn',
     )
-  },
-
-  payRequest: (id) => {
-    const s = get()
-    const req = s.requests.find((r) => r.id === id)
-    if (!req || req.status !== 'approved') return
-    const exp: Expense = {
-      id: `ex-pay-${id}`,
-      lineId: req.lineId,
-      projectId: req.projectId,
-      officeId: req.officeId,
-      requestId: id,
-      amountUSD: req.amountUSD,
-      date: new Date().toISOString(),
-      hasTechReport: false,
-    }
-    set({
-      requests: s.requests.map((x) => (x.id === id ? { ...x, status: 'paid' } : x)),
-      expenses: [exp, ...s.expenses],
-    })
-    get().toast({ ar: `سُجّل صرف ${req.code} — بانتظار التقرير الفني`, en: `${req.code} paid — awaiting technical report` })
   },
 
   submitReallocation: (draft) => {
@@ -217,6 +260,208 @@ export const useStore = create<State>((set, get) => ({
           : { ar: `رُفضت المناقلة ${ra.code}`, en: `${ra.code} rejected` },
       approve ? 'ok' : 'warn',
     )
+  },
+
+
+  // ---- finance ------------------------------------------------------------
+  issuePayment: (requestId, method, staffId) => {
+    const s = get()
+    const req = s.requests.find((r) => r.id === requestId)
+    if (!req || req.status !== 'approved') return
+    const now = new Date().toISOString()
+    const rate = s.rates[s.rates.length - 1].rate
+    const dims = { officeId: req.officeId, projectId: req.projectId, lineId: req.lineId }
+    const account =
+      method === 'cash' || method === 'advance'
+        ? cashAccount(req.officeId)
+        : req.currency === 'USD' && method === 'bank'
+          ? BANK_USD
+          : req.officeId === 'pts' && method === 'bank'
+            ? BANK_PTS
+            : BANK_SDG
+    const sdgAcc = s.accounts.find((a) => a.code === account)?.currency === 'SDG'
+    const credit: JournalLine = { account, debit: 0, credit: req.amountUSD, sdg: sdgAcc ? -Math.round(req.amountUSD * rate) : undefined, officeId: req.officeId }
+    const pvNo = `PV-${String(s.fseq.pv).padStart(4, '0')}`
+    const jeNo = `JE-${String(s.fseq.je).padStart(4, '0')}`
+    const line = findLine(s.projects, req.lineId)!.line
+    let advance: Advance | undefined
+    let expense: Expense | undefined
+    let debit: JournalLine
+    let memo: Bi
+    if (method === 'advance') {
+      const st = staffId ?? staff.find((x) => x.officeId === req.officeId)?.id ?? 's-ksl'
+      const no = `ADV-${String(s.fseq.adv).padStart(4, '0')}`
+      advance = {
+        id: no.toLowerCase(),
+        no,
+        staffId: st,
+        officeId: req.officeId,
+        projectId: req.projectId,
+        lineId: req.lineId,
+        activityCode: req.activityCode ?? `ACT-${req.officeId.toUpperCase()}-${s.fseq.adv}`,
+        requestId: req.id,
+        amountUSD: req.amountUSD,
+        issuedAt: now,
+        dueAt: daysFromNow(14),
+        status: 'open',
+      }
+      debit = { account: ADVANCES, debit: req.amountUSD, credit: 0, ...dims }
+      memo = { ar: `صرف عهدة ${no} — ${req.code}`, en: `Advance ${no} — ${req.code}` }
+    } else {
+      expense = { id: `ex-${req.id}`, requestId: req.id, amountUSD: req.amountUSD, date: now, hasTechReport: false, ...dims }
+      debit = { account: s.lineMap[req.lineId], debit: req.amountUSD, credit: 0, ...dims }
+      memo = { ar: `${req.code} — ${line.code} ${line.name.ar}`, en: `${req.code} — ${line.code} ${line.name.en}` }
+    }
+    const je: JournalEntry = { id: `je-n${s.fseq.je}`, no: jeNo, date: now, memo, source: method === 'advance' ? 'advance' : 'payment', ref: advance?.no ?? pvNo, lines: [debit, credit] }
+    const v: Voucher = {
+      id: `pv-n${s.fseq.pv}`,
+      no: pvNo,
+      kind: 'payment',
+      date: now,
+      method,
+      account,
+      amountUSD: req.amountUSD,
+      currency: req.currency,
+      amount: req.amount,
+      rate,
+      party: advance ? staff.find((x) => x.id === advance!.staffId)!.name : { ar: 'المورد', en: 'Supplier' },
+      memo: req.purpose,
+      requestId: req.id,
+      journalId: je.id,
+      ...dims,
+    }
+    set({
+      requests: s.requests.map((x) => (x.id === requestId ? { ...x, status: 'paid' } : x)),
+      expenses: expense ? [expense, ...s.expenses] : s.expenses,
+      advances: advance ? [advance, ...s.advances] : s.advances,
+      journal: [...s.journal, je],
+      vouchers: [v, ...s.vouchers],
+      fseq: { ...s.fseq, je: s.fseq.je + 1, pv: s.fseq.pv + 1, adv: s.fseq.adv + (advance ? 1 : 0) },
+    })
+    get().toast(
+      advance
+        ? { ar: `صُرفت العهدة ${advance.no} — تُسوّى بعد التقرير الفني`, en: `Advance ${advance.no} issued — settle it after the field report` }
+        : { ar: `صدر سند الصرف ${pvNo} والقيد ${jeNo}`, en: `Payment voucher ${pvNo} and entry ${jeNo} posted` },
+    )
+  },
+
+  recordReceipt: (d) => {
+    const s = get()
+    const now = new Date().toISOString()
+    const rate = s.rates[s.rates.length - 1].rate
+    const rvNo = `RV-${String(s.fseq.rv).padStart(4, '0')}`
+    const sdgAcc = s.accounts.find((a) => a.code === d.account)?.currency === 'SDG'
+    const je: JournalEntry = {
+      id: `je-n${s.fseq.je}`,
+      no: `JE-${String(s.fseq.je).padStart(4, '0')}`,
+      date: now,
+      memo: { ar: d.memo, en: d.memo },
+      source: 'receipt',
+      ref: rvNo,
+      lines: [
+        { account: d.account, debit: d.amountUSD, credit: 0, sdg: sdgAcc ? Math.round(d.amountUSD * rate) : undefined, projectId: d.projectId, officeId: 'khr' },
+        { account: d.revenueAccount, debit: 0, credit: d.amountUSD, projectId: d.projectId },
+      ],
+    }
+    const v: Voucher = {
+      id: `rv-n${s.fseq.rv}`,
+      no: rvNo,
+      kind: 'receipt',
+      date: now,
+      method: 'transfer',
+      account: d.account,
+      amountUSD: d.amountUSD,
+      currency: sdgAcc ? 'SDG' : 'USD',
+      amount: sdgAcc ? Math.round(d.amountUSD * rate) : d.amountUSD,
+      rate,
+      party: { ar: d.party, en: d.party },
+      memo: { ar: d.memo, en: d.memo },
+      officeId: 'khr',
+      projectId: d.projectId,
+      journalId: je.id,
+    }
+    set({ journal: [...s.journal, je], vouchers: [v, ...s.vouchers], fseq: { ...s.fseq, je: s.fseq.je + 1, rv: s.fseq.rv + 1 } })
+    get().toast({ ar: `سُجّل سند القبض ${rvNo}`, en: `Receipt voucher ${rvNo} recorded` })
+  },
+
+  settleAdvance: (id, items, reportNo) => {
+    const s = get()
+    const a = s.advances.find((x) => x.id === id)
+    if (!a || a.status !== 'open') return
+    const now = new Date().toISOString()
+    const rate = s.rates[s.rates.length - 1].rate
+    const spent = Math.round(items.reduce((t, i) => t + i.amountUSD, 0) * 100) / 100
+    const returned = Math.max(0, Math.round((a.amountUSD - spent) * 100) / 100)
+    const reimbursed = Math.max(0, Math.round((spent - a.amountUSD) * 100) / 100)
+    const dims = { officeId: a.officeId, projectId: a.projectId, lineId: a.lineId }
+    const cash = cashAccount(a.officeId)
+    const lines: JournalLine[] = [{ account: s.lineMap[a.lineId], debit: spent, credit: 0, ...dims }]
+    if (returned > 0) lines.push({ account: cash, debit: returned, credit: 0, sdg: Math.round(returned * rate), officeId: a.officeId })
+    lines.push({ account: ADVANCES, debit: 0, credit: a.amountUSD, ...dims })
+    if (reimbursed > 0) lines.push({ account: cash, debit: 0, credit: reimbursed, sdg: -Math.round(reimbursed * rate), officeId: a.officeId })
+    const je: JournalEntry = {
+      id: `je-n${s.fseq.je}`,
+      no: `JE-${String(s.fseq.je).padStart(4, '0')}`,
+      date: now,
+      memo: { ar: `تسوية عهدة ${a.no} — ${a.activityCode}`, en: `Settlement of advance ${a.no} — ${a.activityCode}` },
+      source: 'settlement',
+      ref: a.no,
+      lines,
+    }
+    const expense: Expense = { id: `ex-${a.id}`, amountUSD: spent, date: now, hasTechReport: true, ...dims }
+    set({
+      advances: s.advances.map((x) => (x.id === id ? { ...x, status: 'settled', settlement: { at: now, items, returnedUSD: returned, reimbursedUSD: reimbursed, reportNo } } : x)),
+      journal: [...s.journal, je],
+      expenses: [expense, ...s.expenses],
+      fseq: { ...s.fseq, je: s.fseq.je + 1 },
+    })
+    get().toast({ ar: `سُوّيت العهدة ${a.no} وطوبقت مع التقرير ${reportNo}`, en: `${a.no} settled and matched to report ${reportNo}` })
+  },
+
+  addAccount: (a) => {
+    set((s) => ({ accounts: [...s.accounts, a] }))
+    get().toast({ ar: `أُضيف الحساب ${a.code}`, en: `Account ${a.code} added` })
+  },
+  setLineAccount: (lineId, code) => set((s) => ({ lineMap: { ...s.lineMap, [lineId]: code } })),
+
+  addRate: (rate) => {
+    const s = get()
+    const today = new Date().toDateString()
+    const kept = s.rates.filter((r) => new Date(r.date).toDateString() !== today)
+    set({ rates: [...kept, { date: new Date().toISOString(), rate, source: { ar: 'أدخله مدير الشؤون المالية', en: 'Entered by Finance Manager' } }] })
+    get().toast({ ar: `اعتُمد سعر اليوم ${rate} ج.س للدولار`, en: `Today's rate set to ${rate} SDG per USD` })
+  },
+
+  postRevaluation: () => {
+    const s = get()
+    const rate = s.rates[s.rates.length - 1].rate
+    const rows = revaluation(s.accounts, s.journal, rate).filter((r) => Math.abs(r.diff) >= 0.5)
+    if (!rows.length) return
+    const lines: JournalLine[] = []
+    let net = 0
+    for (const r of rows) {
+      const d = Math.round(r.diff * 100) / 100
+      net += d
+      lines.push({ account: r.account.code, debit: d > 0 ? d : 0, credit: d < 0 ? -d : 0, sdg: 0, officeId: r.account.officeId })
+    }
+    net = Math.round(net * 100) / 100
+    lines.push(net < 0 ? { account: FX_LOSS, debit: -net, credit: 0 } : { account: FX_GAIN, debit: 0, credit: net })
+    const je: JournalEntry = {
+      id: `je-n${s.fseq.je}`,
+      no: `JE-${String(s.fseq.je).padStart(4, '0')}`,
+      date: new Date().toISOString(),
+      memo: { ar: `إعادة تقييم أرصدة الجنيه بسعر ${rate}`, en: `Revaluation of SDG balances at ${rate}` },
+      source: 'fx',
+      lines,
+    }
+    set({ journal: [...s.journal, je], fseq: { ...s.fseq, je: s.fseq.je + 1 } })
+    get().toast({ ar: `رُحّل قيد فروق العملة ${je.no}`, en: `FX entry ${je.no} posted` }, net < 0 ? 'warn' : 'ok')
+  },
+
+  setCashCounted: (officeId, v) => set((s) => ({ closes: s.closes.map((c) => (c.officeId === officeId ? { ...c, cashCounted: v } : c)) })),
+  closeMonth: (officeId) => {
+    set((s) => ({ closes: s.closes.map((c) => (c.officeId === officeId ? { ...c, closedAt: new Date().toISOString(), closedBy: s.userId } : c)) }))
+    get().toast({ ar: 'أُقفل الشهر للمكتب — لا يمكن الترحيل بتاريخ سابق', en: 'Month closed for the office — no back-dated posting' })
   },
 
   updateRule: (id, patch) => set((s) => ({ rules: s.rules.map((r) => (r.id === id ? { ...r, ...patch } : r)) })),
