@@ -65,6 +65,6 @@ Use the role switcher (top corner) to play every role.
 
 ## Notes
 
-- Exchange rate is a fixed demo value (2,450 SDG per USD); the real system keeps a dated rate log.
+- Exchange rates are sample values (rising from about 2,050 to 2,450 SDG per USD over six months).
 - Project names, donors, staff names and figures are sample data.
 - Fonts are bundled locally (no Google Fonts) so the app works on weak connections.
