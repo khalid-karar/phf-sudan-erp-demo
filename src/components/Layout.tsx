@@ -24,6 +24,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import type { Access, ModuleKey } from '../data/types'
 import { useT } from '../lib/i18n'
+import { Tour } from './Help'
 import { helpItem, locate, modules, type NavItem, type NavModule } from '../lib/nav'
 import { useStore, usePerm, useUser } from '../lib/store'
 import { CommandPalette } from './CommandPalette'
@@ -387,10 +388,19 @@ export function Layout({ children }: { children: ReactNode }) {
     document.documentElement.lang = lang
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
   }, [lang])
+  const markVisited = useStore((s) => s.markVisited)
+  const tourSeen = useStore((s) => s.tourSeen)
+  const startTour = useStore((s) => s.startTour)
   useEffect(() => {
     window.scrollTo(0, 0)
     setDrawer(false)
-  }, [loc.pathname])
+    markVisited(loc.pathname)
+  }, [loc.pathname, markVisited])
+  useEffect(() => {
+    if (tourSeen || navigator.webdriver) return
+    const t = setTimeout(startTour, 700)
+    return () => clearTimeout(t)
+  }, [tourSeen, startTour])
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -404,7 +414,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className={`min-h-screen lg:grid ${collapsed ? 'lg:grid-cols-[72px_1fr]' : 'lg:grid-cols-[264px_1fr]'} print:block`}>
-      <aside className="sticky top-0 hidden h-screen lg:block print:hidden">
+      <aside data-tour="sidebar" className="sticky top-0 hidden h-screen lg:block print:hidden">
         <Sidebar collapsed={collapsed} />
       </aside>
       {drawer && (
@@ -417,12 +427,13 @@ export function Layout({ children }: { children: ReactNode }) {
       <div className="min-w-0">
         <div className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur print:hidden">
           <div className="flex items-center gap-2 px-4 py-2.5 sm:gap-3 sm:px-6 lg:px-8">
-            <button className="lg:hidden" onClick={() => setDrawer(true)} aria-label={lang === 'ar' ? 'القائمة' : 'Menu'}>
+            <button data-tour="sidebar" className="lg:hidden" onClick={() => setDrawer(true)} aria-label={lang === 'ar' ? 'القائمة' : 'Menu'}>
               {drawer ? <X /> : <Menu />}
             </button>
             <Breadcrumb />
             <div className="flex-1" />
             <button
+              data-tour="search"
               onClick={() => setPalette(true)}
               className="flex h-9 items-center gap-2 rounded-md border border-line bg-surface px-2.5 text-[13px] text-muted hover:border-nile-2 sm:w-56 lg:w-64"
               aria-label={lang === 'ar' ? 'بحث' : 'Search'}
@@ -435,14 +446,19 @@ export function Layout({ children }: { children: ReactNode }) {
             </button>
             <span className="hidden rounded border border-amber/40 bg-amber-soft px-2 py-0.5 text-[12px] text-amber 2xl:inline">{t('demo')}</span>
             <button
+              data-tour="lang"
               onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
               className="h-9 rounded-md border border-line bg-surface px-2.5 text-[13px] font-medium hover:border-nile-2"
               title={lang === 'ar' ? 'English' : 'العربية'}
             >
               {lang === 'ar' ? 'EN' : 'ع'}
             </button>
-            <NotificationBell />
-            <UserMenu />
+            <span data-tour="bell" className="inline-flex">
+              <NotificationBell />
+            </span>
+            <span data-tour="user" className="inline-flex">
+              <UserMenu />
+            </span>
           </div>
         </div>
         <main className="mx-auto max-w-[1280px] px-4 py-7 sm:px-6 lg:px-8 print:max-w-none print:p-0">
@@ -451,6 +467,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </main>
       </div>
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
+      <Tour />
       <Toasts />
     </div>
   )

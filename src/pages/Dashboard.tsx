@@ -1,6 +1,8 @@
 import { AlertTriangle, CalendarClock, CheckCircle2, CircleAlert, FileWarning, Inbox, Gauge } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { GetStarted } from '../components/GetStarted'
+import { PageHelpButton } from '../components/Help'
 import { SudanMap, type SiteStatus } from '../components/SudanMap'
 import { Panel, UsageBar, UsageLegend } from '../components/ui'
 import { funds } from '../data/seed'
@@ -93,8 +95,11 @@ export function Dashboard() {
     <div className="space-y-6">
       <header>
         <div className="text-[13.5px] text-muted">{date(new Date().toISOString(), lang)}</div>
-        <h1 className="mt-1 text-[28px] font-bold">
-          {greet}{ar ? '، ' : ', '}{user.name[lang].split(' ')[0] === 'د.' ? user.name[lang] : user.name[lang].split(' ')[0]}
+        <h1 className="mt-1 flex items-center gap-2.5 text-[28px] font-bold">
+          <span>
+            {greet}{ar ? '، ' : ', '}{user.name[lang].split(' ')[0] === 'د.' ? user.name[lang] : user.name[lang].split(' ')[0]}
+          </span>
+          <PageHelpButton />
         </h1>
         {canProj && (
         <p className="mt-1.5 max-w-[75ch] text-[15.5px] text-muted">
@@ -124,6 +129,8 @@ export function Dashboard() {
         </p>
         )}
       </header>
+
+      <GetStarted />
 
       {!canProj && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

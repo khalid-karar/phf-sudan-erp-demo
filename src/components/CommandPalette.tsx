@@ -1,6 +1,7 @@
-import { ArrowLeftRight, CornerDownLeft, FileText, Hash, Layers, Plus, Search } from 'lucide-react'
+import { ArrowLeftRight, CircleHelp, CornerDownLeft, FileText, Hash, Layers, Plus, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { articles } from '../lib/help'
 import { helpItem } from '../lib/nav'
 import { usePerm, useStore } from '../lib/store'
 import { useVisibleNav } from './Layout'
@@ -40,6 +41,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       pages: ar ? 'الصفحات' : 'Pages',
       actions: ar ? 'إجراءات سريعة' : 'Quick actions',
       records: ar ? 'السجلات' : 'Records',
+      help: ar ? 'المساعدة' : 'Help',
     }
     const all: Hit[] = []
     for (const m of nav)
@@ -65,14 +67,20 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         for (const a of s.accounts) all.push({ id: 'acc' + a.code, group: G.records, title: `${a.code} ${a.name[lang]}`, sub: ar ? 'دليل الحسابات' : 'Chart of accounts', to: '/finance/accounts', icon: <Hash size={16} /> })
         for (const a of s.advances) all.push({ id: a.id, group: G.records, title: `${a.no} — ${a.activityCode}`, sub: ar ? 'عهدة' : 'Advance', to: '/finance/advances', icon: <ArrowLeftRight size={16} /> })
       }
+      if (can('patients'))
+        for (const b of s.beneficiaries) all.push({ id: b.id, group: G.records, title: b.name[lang], sub: b.no, to: '/patients', icon: <FileText size={16} /> })
+      if (can('hr'))
+        for (const e of s.employees) all.push({ id: e.id, group: G.records, title: e.name[lang], sub: e.position[lang], to: '/hr', icon: <FileText size={16} /> })
+      for (const a of articles)
+        all.push({ id: 'help' + a.path, group: G.help, title: a.title[lang], sub: a.what[lang], to: `/help?a=${encodeURIComponent(a.path)}`, icon: <CircleHelp size={16} /> })
       if (can('settings', 'manage'))
         for (const u of s.users) all.push({ id: u.id, group: G.records, title: u.name[lang], sub: u.email, to: '/settings/users', icon: <FileText size={16} /> })
     }
     const nq = norm(q.trim())
     const res = nq ? all.filter((h) => norm(h.title + ' ' + (h.sub ?? '')).includes(nq)) : all.filter((h) => h.group !== G.records)
     const byGroup: Record<string, number> = {}
-    return res.filter((h) => (byGroup[h.group] = (byGroup[h.group] ?? 0) + 1) <= (h.group === G.records ? 8 : 12))
-  }, [q, nav, lang, ar, can, s.requests, s.projects, s.accounts, s.advances, s.users])
+    return res.filter((h) => (byGroup[h.group] = (byGroup[h.group] ?? 0) + 1) <= (h.group === G.records ? 8 : h.group === G.help ? 4 : 12))
+  }, [q, nav, lang, ar, can, s.requests, s.projects, s.accounts, s.advances, s.users, s.beneficiaries, s.employees])
 
   useEffect(() => setSel(0), [q])
   if (!open) return null

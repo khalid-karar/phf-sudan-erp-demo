@@ -87,6 +87,14 @@ interface State {
   users: User[]
   roles: Role[]
   sidebarCollapsed: boolean
+  tourOpen: boolean
+  tourSeen: boolean
+  visited: Record<string, string[]>
+  checklistHidden: string[]
+  startTour: () => void
+  endTour: () => void
+  markVisited: (path: string) => void
+  hideChecklist: (show?: boolean) => void
   employees: Employee[]
   leaves: LeaveRequest[]
   payrolls: PayrollRun[]
@@ -382,6 +390,21 @@ export const useStore = create<State>()(
   userId: 'u-fo',
   toasts: [],
   sidebarCollapsed: false,
+  tourOpen: false,
+  tourSeen: false,
+  visited: {},
+  checklistHidden: [],
+  startTour: () => set({ tourOpen: true }),
+  endTour: () => set({ tourOpen: false, tourSeen: true }),
+  markVisited: (path) => {
+    const s = get()
+    const mine = s.visited[s.userId] ?? []
+    if (!mine.includes(path)) set({ visited: { ...s.visited, [s.userId]: [...mine, path] } })
+  },
+  hideChecklist: (show) => {
+    const s = get()
+    set({ checklistHidden: show ? s.checklistHidden.filter((u) => u !== s.userId) : [...s.checklistHidden, s.userId] })
+  },
   offlineSim: false,
   ...fresh(),
 
@@ -541,7 +564,7 @@ export const useStore = create<State>()(
   },
   setUser: (userId) => set({ userId }),
   reset: () => {
-    set({ ...fresh(), userId: 'u-fo' })
+    set({ ...fresh(), userId: 'u-fo', visited: {}, checklistHidden: [], tourSeen: false })
     get().toast({ ar: 'أُعيدت بيانات العرض إلى وضعها الأصلي', en: 'Demo data restored to its starting point' })
   },
   toast: (text, tone = 'ok') => {
@@ -1104,8 +1127,9 @@ export const useStore = create<State>()(
     name: 'phf-erp-demo-v9',
     storage: createJSONStorage(() => safeStorage),
     partialize: (s) => {
-      const { toasts: _t, ...rest } = s
+      const { toasts: _t, tourOpen: _o, ...rest } = s
       void _t
+      void _o
       return rest
     },
   },

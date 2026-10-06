@@ -25,6 +25,7 @@ import { Organization } from './pages/settings/Organization'
 import { Roles } from './pages/settings/Roles'
 import { Users } from './pages/settings/Users'
 import { Upcoming } from './pages/Upcoming'
+import { HelpCentre } from './pages/Help'
 import { Leave, Payroll, Staff } from './pages/hr/Hr'
 import { Beneficiaries, PatientStats } from './pages/patients/Patients'
 import { Issues, Items, Receipts, Stock } from './pages/supply/Supply'
@@ -81,6 +82,7 @@ const routes: [string, React.ReactNode][] = [
   ['/hr/payroll', <Payroll />],
   ['/patients', <Beneficiaries />],
   ['/patients/stats', <PatientStats />],
+  ['/help', <HelpCentre />],
   ['/alerts', <Inbox />],
   ['/alerts/calendar', <Calendar />],
 ]

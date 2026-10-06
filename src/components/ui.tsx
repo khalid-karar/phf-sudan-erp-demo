@@ -5,6 +5,7 @@ import type { Usage } from '../lib/budget'
 import { useT } from '../lib/i18n'
 import { useStore } from '../lib/store'
 import { usd as usdFmt } from '../lib/format'
+import { PageHelpButton } from './Help'
 
 type Variant = 'primary' | 'quiet' | 'danger' | 'ok'
 export function Button({ variant = 'primary', className = '', ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
@@ -98,7 +99,10 @@ export function PageHeader({ title, sub, actions }: { title: ReactNode; sub?: Re
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-[26px] font-bold text-ink">{title}</h1>
+        <h1 className="flex items-center gap-2.5 text-[26px] font-bold text-ink">
+          <span className="min-w-0">{title}</span>
+          <PageHelpButton />
+        </h1>
         {sub && <p className="mt-1 max-w-[70ch] text-muted">{sub}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
