@@ -1,14 +1,13 @@
 import { AlertTriangle, Plus, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { Button, PageHeader, Panel } from '../components/ui'
-import { offices, roleNames } from '../data/seed'
+import { roleNames } from '../data/seed'
 import type { ApprovalRule, RoleKey } from '../data/types'
 import { routeApproval } from '../lib/budget'
 import { usd } from '../lib/format'
 import { useLang } from '../lib/i18n'
-import { useStore, useUser } from '../lib/store'
+import { getOffices, usePerm, useStore, useUser } from '../lib/store'
 
-const approverRoles: RoleKey[] = ['supervisor', 'finance_manager', 'executive_director']
 
 function gapsAndOverlaps(rules: ApprovalRule[]) {
   // Checks general (all-office) spend rules for amounts that match no rule or two rules.
@@ -29,7 +28,9 @@ export function Rules() {
   const ar = lang === 'ar'
   const s = useStore()
   const user = useUser()
-  const canEdit = user.role === 'finance_manager' || user.role === 'executive_director'
+  const { can } = usePerm()
+  void user
+  const canEdit = can('settings', 'edit')
   const spend = s.rules.filter((r) => r.appliesTo === 'spend').sort((a, b) => (a.officeId ? 1 : 0) - (b.officeId ? 1 : 0) || a.minUSD - b.minUSD)
   const realloc = s.rules.filter((r) => r.appliesTo === 'reallocation')
   const issues = gapsAndOverlaps(s.rules)
@@ -46,7 +47,7 @@ export function Rules() {
       />
       {!canEdit && (
         <p className="mb-4 rounded-md bg-amber-soft px-4 py-2.5 text-[14px] text-amber">
-          {ar ? 'للعرض فقط. بدّل الدور إلى مدير الشؤون المالية أو المدير التنفيذي للتعديل.' : 'View only. Switch to the Finance Manager or Executive Director to edit.'}
+          {ar ? 'للعرض فقط. التعديل يحتاج صلاحية إدخال في الإعدادات.' : 'View only. Editing needs enter access to Settings.'}
         </p>
       )}
 
@@ -107,6 +108,7 @@ function RuleRow({ rule, canEdit }: { rule: ApprovalRule; canEdit: boolean }) {
   const ar = lang === 'ar'
   const s = useStore()
   const up = (patch: Partial<ApprovalRule>) => s.updateRule(rule.id, patch)
+  const approverRoles: RoleKey[] = s.roles.filter((r) => r.canApprove).map((r) => r.id)
   const remaining = approverRoles.filter((r) => !rule.chain.includes(r))
   const numInput = 'num h-9 w-28 rounded-md border border-line bg-surface px-2.5 text-[14px] disabled:bg-paper'
 
@@ -152,7 +154,7 @@ function RuleRow({ rule, canEdit }: { rule: ApprovalRule; canEdit: boolean }) {
           onChange={(e) => up({ officeId: e.target.value || null })}
         >
           <option value="">{ar ? 'كل المكاتب' : 'all offices'}</option>
-          {offices.map((o) => (
+          {getOffices().map((o) => (
             <option key={o.id} value={o.id}>
               {o.name[lang]}
             </option>
@@ -212,7 +214,7 @@ function Tester() {
         <label className="block text-[13.5px]">
           {ar ? 'المكتب' : 'Office'}
           <select className="mt-1 h-10 w-full rounded-md border border-line bg-surface px-2" value={office} onChange={(e) => setOffice(e.target.value)}>
-            {offices.map((o) => (
+            {getOffices().map((o) => (
               <option key={o.id} value={o.id}>
                 {o.name[lang]}
               </option>

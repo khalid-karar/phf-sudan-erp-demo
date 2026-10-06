@@ -6,7 +6,7 @@ import { Button, PageHeader, Panel, StatusBadge, UsageBar, UsageLegend } from '.
 import { lineUsage, pillarUsage, projectUsage, reallocDelta, findLine } from '../lib/budget'
 import { date, usd } from '../lib/format'
 import { useLang, useT } from '../lib/i18n'
-import { useStore, useUser } from '../lib/store'
+import { usePerm, useStore, useUser } from '../lib/store'
 
 export function ProjectsList() {
   const lang = useLang()
@@ -66,7 +66,9 @@ export function ProjectDetail() {
   const [realloc, setRealloc] = useState<{ to?: string } | null>(null)
   if (!project) return <p>{ar ? 'المشروع غير موجود' : 'Project not found'}</p>
   const u = projectUsage(project, s)
-  const canEditControl = user.role === 'finance_manager' || user.role === 'executive_director'
+  const { can } = usePerm()
+  void user
+  const canEditControl = can('projects', 'manage')
   const reallocs = s.reallocations.filter((r) => r.projectId === project.id)
 
   return (
@@ -160,7 +162,7 @@ export function ProjectDetail() {
               %
             </label>
           )}
-          {!canEditControl && <p className="mt-3 text-[12.5px] text-muted">{ar ? 'يعدّلها مدير الشؤون المالية أو المدير التنفيذي.' : 'Editable by the Finance Manager or Executive Director.'}</p>}
+          {!canEditControl && <p className="mt-3 text-[12.5px] text-muted">{ar ? 'يعدّلها من لديه صلاحية إدارة المشاريع.' : 'Editable with manage access to Projects.'}</p>}
         </Panel>
       </div>
 

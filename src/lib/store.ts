@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { buildSeed, daysFromNow, projects as seedProjects, users } from '../data/seed'
+import { createJSONStorage, persist } from 'zustand/middleware'
+import { buildSeed, daysFromNow, offices as seedOffices, orgDefaults, projects as seedProjects, roles as seedRoles, users as seedUsers } from '../data/seed'
 import {
   accounts as seedAccounts,
   ADVANCES,
@@ -15,6 +16,12 @@ import {
   staff,
 } from '../data/finance'
 import type {
+  Access,
+  ModuleKey,
+  Office,
+  OrgSettings,
+  Role,
+  User,
   Account,
   Advance,
   ApprovalRule,
@@ -46,6 +53,18 @@ export interface Toast {
 interface State {
   lang: Lang
   userId: string
+  org: OrgSettings
+  offices: Office[]
+  users: User[]
+  roles: Role[]
+  sidebarCollapsed: boolean
+
+  setOrg: (patch: Partial<OrgSettings>) => void
+  saveOffice: (o: Office) => void
+  saveUser: (u: User) => void
+  saveRole: (r: Role) => void
+  deleteRole: (id: string) => void
+  setSidebarCollapsed: (v: boolean) => void
   projects: Project[]
   expenses: Expense[]
   requests: SpendRequest[]
@@ -106,6 +125,10 @@ const fresh = () => {
   const lineMap = defaultLineMap()
   const f = buildFinance(s.expenses, lineMap)
   return {
+    org: structuredClone(orgDefaults),
+    offices: structuredClone(seedOffices),
+    users: structuredClone(seedUsers),
+    roles: structuredClone(seedRoles),
     accounts: structuredClone(seedAccounts),
     lineMap,
     journal: f.journal,
@@ -122,6 +145,32 @@ const fresh = () => {
     deadlines: s.deadlines,
     seq: 143,
   }
+}
+
+// localStorage can throw (private mode, blocked storage); fall back to memory.
+const mem = new Map<string, string>()
+const safeStorage = {
+  getItem: (k: string) => {
+    try {
+      return localStorage.getItem(k)
+    } catch {
+      return mem.get(k) ?? null
+    }
+  },
+  setItem: (k: string, v: string) => {
+    try {
+      localStorage.setItem(k, v)
+    } catch {
+      mem.set(k, v)
+    }
+  },
+  removeItem: (k: string) => {
+    try {
+      localStorage.removeItem(k)
+    } catch {
+      mem.delete(k)
+    }
+  },
 }
 
 const initialLang = (): Lang => {
@@ -145,11 +194,54 @@ const decide = (steps: ApprovalStep[], userId: string, approve: boolean, note?: 
   return { steps: next, done: true, approved: true }
 }
 
-export const useStore = create<State>((set, get) => ({
+export const useStore = create<State>()(
+  persist(
+  (set, get) => ({
   lang: initialLang(),
   userId: 'u-fo',
   toasts: [],
+  sidebarCollapsed: false,
   ...fresh(),
+
+  setOrg: (patch) => {
+    set((s) => ({ org: { ...s.org, ...patch } }))
+    get().toast({ ar: 'حُفظت إعدادات المؤسسة', en: 'Organization settings saved' })
+  },
+  saveOffice: (o) => {
+    const s = get()
+    const exists = s.offices.some((x) => x.id === o.id)
+    if (exists) {
+      set({ offices: s.offices.map((x) => (x.id === o.id ? o : x)) })
+      get().toast({ ar: `حُفظ مكتب ${o.name.ar}`, en: `${o.name.en} office saved` })
+      return
+    }
+    // A new office gets its own cash box account and a month-close row.
+    const boxes = s.accounts.filter((a) => a.parent === '1101')
+    const code = `1101-${String(boxes.length + 1).padStart(2, '0')}`
+    const acc: Account = { code, parent: '1101', name: { ar: `صندوق مكتب ${o.name.ar}`, en: `${o.name.en} cash box` }, type: 'asset', postable: true, currency: 'SDG', officeId: o.id }
+    set({ offices: [...s.offices, o], accounts: [...s.accounts, acc], closes: [...s.closes, { officeId: o.id, cashCounted: false }] })
+    get().toast({ ar: `أُضيف مكتب ${o.name.ar} وأُنشئ له حساب صندوق ${code}`, en: `${o.name.en} office added with cash box account ${code}` })
+  },
+  saveUser: (u) => {
+    const s = get()
+    const exists = s.users.some((x) => x.id === u.id)
+    set({ users: exists ? s.users.map((x) => (x.id === u.id ? u : x)) : [...s.users, u] })
+    get().toast(
+      exists
+        ? { ar: `حُفظ المستخدم ${u.name.ar}`, en: `${u.name.en} saved` }
+        : { ar: `أُضيف ${u.name.ar} وأُرسلت دعوة الدخول إلى ${u.email ?? ''}`, en: `${u.name.en} added; sign-in invitation sent to ${u.email ?? ''}` },
+    )
+  },
+  saveRole: (r) => {
+    const s = get()
+    const exists = s.roles.some((x) => x.id === r.id)
+    set({ roles: exists ? s.roles.map((x) => (x.id === r.id ? r : x)) : [...s.roles, r] })
+  },
+  deleteRole: (id) => {
+    set((s) => ({ roles: s.roles.filter((r) => r.id !== id) }))
+    get().toast({ ar: 'حُذف الدور', en: 'Role deleted' }, 'warn')
+  },
+  setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
 
   setLang: (lang) => {
     try {
@@ -273,7 +365,7 @@ export const useStore = create<State>((set, get) => ({
     const dims = { officeId: req.officeId, projectId: req.projectId, lineId: req.lineId }
     const account =
       method === 'cash' || method === 'advance'
-        ? cashAccount(req.officeId)
+        ? cashAccount(req.officeId, s.accounts)
         : req.currency === 'USD' && method === 'bank'
           ? BANK_USD
           : req.officeId === 'pts' && method === 'bank'
@@ -394,7 +486,7 @@ export const useStore = create<State>((set, get) => ({
     const returned = Math.max(0, Math.round((a.amountUSD - spent) * 100) / 100)
     const reimbursed = Math.max(0, Math.round((spent - a.amountUSD) * 100) / 100)
     const dims = { officeId: a.officeId, projectId: a.projectId, lineId: a.lineId }
-    const cash = cashAccount(a.officeId)
+    const cash = cashAccount(a.officeId, s.accounts)
     const lines: JournalLine[] = [{ account: s.lineMap[a.lineId], debit: spent, credit: 0, ...dims }]
     if (returned > 0) lines.push({ account: cash, debit: returned, credit: 0, sdg: Math.round(returned * rate), officeId: a.officeId })
     lines.push({ account: ADVANCES, debit: 0, credit: a.amountUSD, ...dims })
@@ -484,11 +576,40 @@ export const useStore = create<State>((set, get) => ({
   removeRule: (id) => set((s) => ({ rules: s.rules.filter((r) => r.id !== id) })),
   setProjectControl: (projectId, mode, tolerancePct) =>
     set((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, controlMode: mode, tolerancePct } : p)) })),
-}))
+  }),
+  {
+    name: 'phf-erp-demo-v3',
+    storage: createJSONStorage(() => safeStorage),
+    partialize: (s) => {
+      const { toasts: _t, ...rest } = s
+      void _t
+      return rest
+    },
+  },
+  ),
+)
+
+// Role names are read outside React in a few places; keep a live copy.
+const syncRoles = () => ((globalThis as { __phfRoles?: Role[] }).__phfRoles = useStore.getState().roles)
+syncRoles()
+useStore.subscribe(syncRoles)
+
+export const getOffices = () => useStore.getState().offices
+export const getUsers = () => useStore.getState().users
+
+const rank: Record<Access, number> = { none: 0, view: 1, edit: 2, manage: 3 }
+export function usePerm() {
+  const user = useUser()
+  const role = useStore((s) => s.roles.find((r) => r.id === user.role))
+  const can = (m: ModuleKey, min: Access = 'view') => !!role && rank[role.permissions[m]] >= rank[min]
+  const scopeOffice = role?.scope === 'office' ? user.officeId : null
+  return { can, role, user, scopeOffice }
+}
 
 export const useUser = () => {
   const id = useStore((s) => s.userId)
-  return users.find((u) => u.id === id)!
+  const users = useStore((s) => s.users)
+  return users.find((u) => u.id === id) ?? users[0]
 }
 
 export { daysFromNow }

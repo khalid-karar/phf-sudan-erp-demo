@@ -2,12 +2,11 @@ import { AlertTriangle, BellRing, CheckCircle2, Clock, FileCheck2, FileX2, Plus,
 import { useEffect, useState } from 'react'
 import { Button, Modal, PageHeader, Panel } from '../../components/ui'
 import { fieldActivities, staff } from '../../data/finance'
-import { offices } from '../../data/seed'
 import type { Advance, SettlementItem } from '../../data/types'
 import { findLine } from '../../lib/budget'
 import { date, daysUntil, relDays, usd } from '../../lib/format'
 import { useLang } from '../../lib/i18n'
-import { useStore, useUser } from '../../lib/store'
+import { getOffices, usePerm, useStore, useUser } from '../../lib/store'
 import { useAccountName } from './common'
 
 export const activityFor = (code: string) => fieldActivities.find((a) => a.code === code)
@@ -23,8 +22,10 @@ export function Advances() {
   const overdue = open.filter((a) => daysUntil(a.dueAt) < 0)
   const outstanding = open.reduce((t, a) => t + a.amountUSD, 0)
   const ready = open.filter((a) => activityFor(a.activityCode)?.report)
-  const list = s.advances.filter((a) => filter === 'all' || a.status === filter).sort((a, b) => +new Date(a.dueAt) - +new Date(b.dueAt))
-  const canSettle = user.role === 'finance_manager'
+  const list = s.advances.filter((a) => (!scopeOffice || a.officeId === scopeOffice) && (filter === 'all' || a.status === filter)).sort((a, b) => +new Date(a.dueAt) - +new Date(b.dueAt))
+  const { can, scopeOffice } = usePerm()
+  void user
+  const canSettle = can('finance', 'edit')
 
   return (
     <div>
@@ -82,7 +83,7 @@ export function Advances() {
                   </td>
                   <td className="py-3 pe-3">
                     {st?.name[lang]}
-                    <span className="block text-[12.5px] text-muted">{offices.find((o) => o.id === a.officeId)?.name[lang]}</span>
+                    <span className="block text-[12.5px] text-muted">{getOffices().find((o) => o.id === a.officeId)?.name[lang]}</span>
                   </td>
                   <td className="py-3 pe-3">
                     <span className="num text-[13px] text-muted">{a.activityCode}</span>
@@ -138,7 +139,7 @@ export function Advances() {
           </tbody>
         </table>
       </Panel>
-      {!canSettle && <p className="mt-3 text-[13px] text-muted">{ar ? 'التسوية يعتمدها مدير الشؤون المالية.' : 'Settlement is done by the Finance Manager.'}</p>}
+      {!canSettle && <p className="mt-3 text-[13px] text-muted">{ar ? 'التسوية لمن لديه صلاحية إدخال في المالية.' : 'Settlement needs enter access to Finance.'}</p>}
       {settling && <SettleModal advance={settling} onClose={() => setSettling(null)} />}
     </div>
   )

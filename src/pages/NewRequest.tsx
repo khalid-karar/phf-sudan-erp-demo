@@ -3,11 +3,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ReallocationModal } from '../components/ReallocationModal'
 import { Button, Field, inputCls, PageHeader, Panel, UsageBar } from '../components/ui'
-import { offices, roleNames } from '../data/seed'
+import { roleNames } from '../data/seed'
 import { checkCeiling, routeApproval, type Level } from '../lib/budget'
 import { num, sdg, usd } from '../lib/format'
 import { useLang } from '../lib/i18n'
-import { useStore, useUser } from '../lib/store'
+import { getOffices, usePerm, useStore, useUser } from '../lib/store'
 
 const levelName: Record<Level, { ar: string; en: string }> = {
   line: { ar: 'البند', en: 'Line' },
@@ -23,6 +23,7 @@ export function NewRequest() {
   const nav = useNavigate()
   const [params] = useSearchParams()
   const SDG_RATE = s.rates[s.rates.length - 1].rate
+  const perm = usePerm()
 
   const [projectId, setProjectId] = useState(params.get('project') ?? s.projects[0].id)
   const project = s.projects.find((p) => p.id === projectId)!
@@ -106,8 +107,8 @@ export function NewRequest() {
       <div className="grid gap-6 lg:grid-cols-[1fr_1.05fr]">
         <Panel className="space-y-4 p-5">
           <Field label={ar ? 'المكتب' : 'Office'}>
-            <select className={inputCls} value={officeId} onChange={(e) => setOfficeId(e.target.value)} disabled={user.role === 'field_officer'}>
-              {offices.map((o) => (
+            <select className={inputCls} value={officeId} onChange={(e) => setOfficeId(e.target.value)} disabled={!!perm.scopeOffice}>
+              {getOffices().map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.name[lang]}
                 </option>

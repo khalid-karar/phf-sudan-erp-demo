@@ -3,11 +3,12 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { SudanMap, type SiteStatus } from '../components/SudanMap'
 import { Panel, UsageBar, UsageLegend } from '../components/ui'
-import { funds, offices } from '../data/seed'
+import { funds } from '../data/seed'
 import { lineUsage, pct, projectUsage } from '../lib/budget'
 import { date, daysUntil, relDays, usd } from '../lib/format'
 import { useLang } from '../lib/i18n'
-import { useStore, useUser } from '../lib/store'
+import { getOffices, usePerm, useStore, useUser } from '../lib/store'
+import { useVisibleNav } from '../components/Layout'
 
 const statusLabel: Record<SiteStatus, { ar: string; en: string }> = {
   good: { ar: 'مطابق', en: 'Matched' },
@@ -21,13 +22,17 @@ export function Dashboard() {
   const lang = useLang()
   const user = useUser()
   const s = useStore()
-  const [selected, setSelected] = useState<string | null>('ksl')
+  const { can, scopeOffice } = usePerm()
+  const canFin = can('finance')
+  const canProj = can('projects')
+  const nav = useVisibleNav()
+  const [selected, setSelected] = useState<string | null>(scopeOffice ?? 'ksl')
   const ar = lang === 'ar'
 
   // --- per-office reconciliation status (field report vs money spent) ---
   const siteData = useMemo(() => {
     const out: Record<string, { status: SiteStatus; unmatched: number; unmatchedUSD: number; spentUSD: number; pending: number }> = {}
-    for (const o of offices) {
+    for (const o of getOffices()) {
       const ex = s.expenses.filter((e) => e.officeId === o.id)
       const recent = ex.filter((e) => daysUntil(e.date) > -60)
       const um = recent.filter((e) => !e.hasTechReport)
@@ -57,13 +62,14 @@ export function Dashboard() {
         .filter(({ u }) => u.ceiling > 0 && pct(u.ceiling - u.available, u.ceiling) >= 0.85),
     ),
   )
-  const unmatchedTotal = Object.values(siteData).reduce((a, v) => a + v.unmatched, 0)
-  const unmatchedUSD = Object.values(siteData).reduce((a, v) => a + v.unmatchedUSD, 0)
+  const inScope = Object.entries(siteData).filter(([id]) => !scopeOffice || id === scopeOffice).map(([, v]) => v)
+  const unmatchedTotal = inScope.reduce((a, v) => a + v.unmatched, 0)
+  const unmatchedUSD = inScope.reduce((a, v) => a + v.unmatchedUSD, 0)
   const worstOffices = Object.entries(siteData)
-    .filter(([, v]) => v.unmatched > 0)
+    .filter(([id, v]) => v.unmatched > 0 && (!scopeOffice || id === scopeOffice))
     .sort((a, b) => b[1].unmatchedUSD - a[1].unmatchedUSD)
     .slice(0, 2)
-    .map(([id]) => offices.find((o) => o.id === id)!.name[lang])
+    .map(([id]) => getOffices().find((o) => o.id === id)!.name[lang])
   const alerting = s.deadlines
     .filter((d) => daysUntil(d.due) <= d.notifyDaysBefore)
     .sort((a, b) => +new Date(a.due) - +new Date(b.due))
@@ -79,7 +85,7 @@ export function Dashboard() {
   const greet = ar ? (hour < 12 ? 'صباح الخير' : 'مساء الخير') : hour < 12 ? 'Good morning' : 'Good afternoon'
   const nearest = alerting.find((d) => daysUntil(d.due) >= 0)
 
-  const sel = selected ? offices.find((o) => o.id === selected)! : null
+  const sel = selected ? getOffices().find((o) => o.id === selected)! : null
   const selData = selected ? siteData[selected] : null
 
   return (
@@ -89,6 +95,7 @@ export function Dashboard() {
         <h1 className="mt-1 text-[28px] font-bold">
           {greet}{ar ? '، ' : ', '}{user.name[lang].split(' ')[0] === 'د.' ? user.name[lang] : user.name[lang].split(' ')[0]}
         </h1>
+        {canProj && (
         <p className="mt-1.5 max-w-[75ch] text-[15.5px] text-muted">
           {ar ? (
             <>
@@ -114,9 +121,25 @@ export function Dashboard() {
             </>
           )}
         </p>
+        )}
       </header>
 
-      {/* The two funding streams */}
+      {!canProj && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {nav
+            .filter((m) => m.key !== 'dashboard')
+            .flatMap((m) => m.items.slice(0, 3).map((it) => ({ m, it })))
+            .map(({ m, it }) => (
+              <Link key={it.to} to={it.to} className="rounded-lg border border-line bg-surface p-4 hover:border-nile-2">
+                <div className="text-[12.5px] text-muted">{m.label[lang]}</div>
+                <div className="font-medium">{it.label[lang]}</div>
+                {it.hint && <div className="text-[13px] text-muted">{it.hint[lang]}</div>}
+              </Link>
+            ))}
+        </div>
+      )}
+
+      {canFin && (<>{/* The two funding streams */}
       <Panel className="grid divide-y divide-line md:grid-cols-2 md:divide-x md:divide-y-0 md:rtl:divide-x-reverse">
         <FundBlock
           title={cash.name[lang]}
@@ -134,8 +157,9 @@ export function Dashboard() {
           parts={[{ v: inkindIssued, label: ar ? 'صُرف للمكاتب' : 'Issued to offices', cls: 'bg-nile' }]}
           note={ar ? 'القيمة التقديرية للمواد العينية' : 'Estimated value of in-kind goods'}
         />
-      </Panel>
+      </Panel></>)}
 
+      {canProj && (
       <div className="grid gap-6 xl:grid-cols-[1.45fr_1fr]">
         {/* Map */}
         <Panel
@@ -151,7 +175,7 @@ export function Dashboard() {
           }
         >
           <div className="grid gap-2 p-4 md:grid-cols-[1.3fr_1fr] md:items-center">
-            <SudanMap offices={offices} status={statusMap} selected={selected} onSelect={setSelected} />
+            <SudanMap offices={getOffices()} status={statusMap} selected={selected} onSelect={setSelected} />
             {sel && selData && (
               <div className="rounded-md bg-paper p-4">
                 <div className="text-[12.5px] text-muted">{sel.state[lang]}</div>
@@ -242,8 +266,9 @@ export function Dashboard() {
           </ul>
         </Panel>
       </div>
+      )}
 
-      {/* Projects */}
+      {canProj && (<>{/* Projects */}
       <Panel title={ar ? 'المشاريع — الصرف مقابل السقف' : 'Projects — spending against ceiling'} aside={<UsageLegend />}>
         <ul className="divide-y divide-line">
           {s.projects.map((p) => {
@@ -269,7 +294,7 @@ export function Dashboard() {
             )
           })}
         </ul>
-      </Panel>
+      </Panel></>)}
     </div>
   )
 }

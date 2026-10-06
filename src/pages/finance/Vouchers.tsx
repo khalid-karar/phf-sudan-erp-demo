@@ -4,12 +4,11 @@ import { Link } from 'react-router-dom'
 import { PayModal } from '../../components/PayModal'
 import { Button, Field, inputCls, Modal, PageHeader, Panel } from '../../components/ui'
 import { BANK_SDG, BANK_USD } from '../../data/finance'
-import { offices } from '../../data/seed'
 import type { JournalEntry, SpendRequest } from '../../data/types'
 import { findLine } from '../../lib/budget'
 import { date, money, usd } from '../../lib/format'
 import { useLang } from '../../lib/i18n'
-import { useStore, useUser } from '../../lib/store'
+import { getOffices, usePerm, useStore, useUser } from '../../lib/store'
 import { JournalEntryModal, methodName, Tabs, useAccountName } from './common'
 
 export function Vouchers() {
@@ -22,7 +21,9 @@ export function Vouchers() {
   const [paying, setPaying] = useState<SpendRequest | null>(null)
   const [entry, setEntry] = useState<JournalEntry | null>(null)
   const [receipt, setReceipt] = useState(false)
-  const isFM = user.role === 'finance_manager'
+  const { can } = usePerm()
+  void user
+  const isFM = can('finance', 'edit')
   const awaiting = s.requests.filter((r) => r.status === 'approved').sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
   const list = s.vouchers.filter((v) => v.kind === tab).sort((a, b) => +new Date(b.date) - +new Date(a.date))
 
@@ -41,7 +42,7 @@ export function Vouchers() {
       />
 
       <Panel className="mb-6" title={ar ? `طلبات معتمدة بانتظار الصرف (${awaiting.length})` : `Approved requests awaiting payment (${awaiting.length})`}>
-        {!isFM && <p className="border-b border-line bg-amber-soft px-5 py-2 text-[13px] text-amber">{ar ? 'الصرف يتم بواسطة مدير الشؤون المالية — بدّل الدور للمتابعة.' : 'Payments are issued by the Finance Manager — switch role to continue.'}</p>}
+        {!isFM && <p className="border-b border-line bg-amber-soft px-5 py-2 text-[13px] text-amber">{ar ? 'دورك يتيح العرض فقط. الصرف لمن لديه صلاحية إدخال في المالية.' : 'Your role is view-only here. Payments need enter access to Finance.'}</p>}
         <div className="max-h-[340px] overflow-auto">
           <table className="w-full min-w-[760px] text-[14px]">
             <tbody className="divide-y divide-line">
@@ -57,7 +58,7 @@ export function Vouchers() {
                     <td className="py-2.5 pe-3">
                       <div className="max-w-[340px] truncate">{r.purpose[lang]}</div>
                       <div className="text-[12.5px] text-muted">
-                        {offices.find((o) => o.id === r.officeId)?.name[lang]}
+                        {getOffices().find((o) => o.id === r.officeId)?.name[lang]}
                         {ar ? '، ' : ', '}
                         {f.project.code} {f.line.code}
                         {r.activityCode && <span className="num">{ar ? '، ' : ', '}{r.activityCode}</span>}
@@ -113,7 +114,7 @@ export function Vouchers() {
                       {v.party[lang]}
                       {v.projectId && <>{ar ? '، ' : ', '}{s.projects.find((p) => p.id === v.projectId)?.code}</>}
                       {ar ? '، ' : ', '}
-                      {offices.find((o) => o.id === v.officeId)?.name[lang]}
+                      {getOffices().find((o) => o.id === v.officeId)?.name[lang]}
                     </div>
                   </td>
                   <td className="py-2.5 pe-3 text-[13px]">

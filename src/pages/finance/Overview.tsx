@@ -3,11 +3,10 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader, Panel } from '../../components/ui'
 import { staff } from '../../data/finance'
-import { offices } from '../../data/seed'
 import { date, daysUntil, num, relDays, usd } from '../../lib/format'
 import { balances, revaluation } from '../../lib/ledger'
 import { useLang } from '../../lib/i18n'
-import { useStore } from '../../lib/store'
+import { getOffices, useStore } from '../../lib/store'
 import { activityFor } from './Advances'
 import { useCloseChecks } from './Close'
 
@@ -79,7 +78,7 @@ export function FinanceOverview() {
                       <span className="num me-2 text-muted">{a.no}</span>
                       {staff.find((x) => x.id === a.staffId)?.name[lang]}
                       <span className="block text-[12.5px] text-muted">
-                        {offices.find((o) => o.id === a.officeId)?.name[lang]}
+                        {getOffices().find((o) => o.id === a.officeId)?.name[lang]}
                         {ar ? '، ' : ', '}
                         {hasReport ? (ar ? 'التقرير مستلم — جاهزة للتسوية' : 'report in — ready to settle') : ar ? 'بانتظار التقرير الفني' : 'waiting for field report'}
                       </span>

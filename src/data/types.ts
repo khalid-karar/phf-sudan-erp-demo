@@ -3,13 +3,29 @@
 export type Lang = 'ar' | 'en'
 export type Bi = { ar: string; en: string }
 
-export type RoleKey = 'field_officer' | 'supervisor' | 'finance_manager' | 'executive_director'
+export type RoleKey = string
+
+export type ModuleKey = 'dashboard' | 'projects' | 'activities' | 'finance' | 'supply' | 'logistics' | 'patients' | 'hr' | 'reports' | 'alerts' | 'settings'
+export type Access = 'none' | 'view' | 'edit' | 'manage'
+
+export interface Role {
+  id: RoleKey
+  name: Bi
+  description: Bi
+  permissions: Record<ModuleKey, Access>
+  scope: 'office' | 'all' // office = sees only their own office's records
+  canApprove: boolean // can appear as a step in approval routes
+  system?: boolean // cannot be deleted
+}
 
 export interface User {
   id: string
   name: Bi
   role: RoleKey
   officeId: string
+  email?: string
+  phone?: string
+  active?: boolean
 }
 
 export interface Office {
@@ -19,6 +35,22 @@ export interface Office {
   lat: number
   lon: number
   isHQ?: boolean
+  type?: 'hq' | 'office' | 'warehouse'
+  managerId?: string
+  phone?: string
+  active?: boolean
+}
+
+export interface OrgSettings {
+  name: Bi
+  shortName: Bi
+  logo: string // URL or data URL
+  hqName: Bi // headquarters the monthly report goes to
+  localCurrency: string
+  baseCurrency: string
+  fiscalYearStartMonth: number // 1–12
+  defaultLang: Lang
+  weekStartsOn: 'sat' | 'sun' | 'mon'
 }
 
 export type FundType = 'cash' | 'inkind' // دعم نقدي → Finance ; التغذية → Supply chain

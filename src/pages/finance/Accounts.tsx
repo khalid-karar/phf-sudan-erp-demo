@@ -1,12 +1,11 @@
 import { CheckCircle2, ChevronDown, Plus, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button, Field, inputCls, Modal, PageHeader, Panel } from '../../components/ui'
-import { offices } from '../../data/seed'
 import type { Account, AccountType } from '../../data/types'
 import { balances, children, lineMatches, nextAccountCode } from '../../lib/ledger'
 import { date, usd } from '../../lib/format'
 import { useLang } from '../../lib/i18n'
-import { useStore, useUser } from '../../lib/store'
+import { getOffices, usePerm, useStore, useUser } from '../../lib/store'
 
 export const typeName: Record<AccountType, { ar: string; en: string }> = {
   asset: { ar: 'أصول', en: 'Asset' },
@@ -20,7 +19,9 @@ export function Accounts() {
   const lang = useLang()
   const ar = lang === 'ar'
   const user = useUser()
-  const canEdit = user.role === 'finance_manager' || user.role === 'executive_director'
+  const { can } = usePerm()
+  void user
+  const canEdit = can('finance', 'manage')
   const [tab, setTab] = useState<'tree' | 'mapping'>('tree')
   const [adding, setAdding] = useState(false)
   const [statement, setStatement] = useState<Account | null>(null)
@@ -140,7 +141,7 @@ function Tree({ onOpen }: { onOpen: (a: Account) => void }) {
         </div>
         <select className="h-10 rounded-md border border-line bg-surface px-2 text-[14px]" value={office} onChange={(e) => setOffice(e.target.value)}>
           <option value="">{ar ? 'كل المكاتب' : 'All offices'}</option>
-          {offices.map((o) => (
+          {getOffices().map((o) => (
             <option key={o.id} value={o.id}>
               {o.name[lang]}
             </option>
@@ -306,7 +307,7 @@ function AddAccount({ open, onClose }: { open: boolean; onClose: () => void }) {
             <Field label={ar ? 'المكتب' : 'Office'}>
               <select className={inputCls} value={office} onChange={(e) => setOffice(e.target.value)}>
                 <option value="">—</option>
-                {offices.map((o) => (
+                {getOffices().map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.name[lang]}
                   </option>
@@ -343,7 +344,7 @@ function Statement({ account, onClose }: { account: Account | null; onClose: () 
       return { e, l, run }
     })
   const proj = (id?: string) => s.projects.find((p) => p.id === id)?.code
-  const off = (id?: string) => offices.find((o) => o.id === id)?.name[lang]
+  const off = (id?: string) => getOffices().find((o) => o.id === id)?.name[lang]
   return (
     <Modal open onClose={onClose} title={`${ar ? 'كشف حساب' : 'Account statement'} — ${account.code} ${account.name[lang]}`} wide>
       <div className="max-h-[60vh] overflow-auto">

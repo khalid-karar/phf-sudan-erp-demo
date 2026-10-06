@@ -1,12 +1,11 @@
 import { CheckCircle2 } from 'lucide-react'
 import { Modal } from '../../components/ui'
-import { offices } from '../../data/seed'
 import type { JournalEntry, JournalSource, PayMethod } from '../../data/types'
 import { findLine } from '../../lib/budget'
 import { date, usd } from '../../lib/format'
 import { entryTotals } from '../../lib/ledger'
 import { useLang } from '../../lib/i18n'
-import { useStore } from '../../lib/store'
+import { getOffices, useStore } from '../../lib/store'
 
 export const sourceName: Record<JournalSource, { ar: string; en: string }> = {
   opening: { ar: 'افتتاحي', en: 'Opening' },
@@ -43,7 +42,7 @@ export function JournalEntryModal({ entry, onClose }: { entry: JournalEntry | nu
     const parts: string[] = []
     if (l.projectId) parts.push(s.projects.find((p) => p.id === l.projectId)!.code)
     if (l.lineId) parts.push(`${ar ? 'بند' : 'line'} ${findLine(s.projects, l.lineId)?.line.code}`)
-    if (l.officeId) parts.push(offices.find((o) => o.id === l.officeId)!.name[lang])
+    if (l.officeId) parts.push(getOffices().find((o) => o.id === l.officeId)!.name[lang])
     return parts.join(ar ? '، ' : ', ')
   }
   return (

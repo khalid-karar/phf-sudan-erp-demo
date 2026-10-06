@@ -19,15 +19,19 @@ export function SudanMap({
   status,
   selected,
   onSelect,
+  onPick,
+  pick,
 }: {
   offices: Office[]
   status: Record<string, SiteStatus>
   selected: string | null
   onSelect: (id: string) => void
+  onPick?: (lon: number, lat: number) => void // click anywhere on the map to place a point
+  pick?: [number, number] | null
 }) {
   const lang = useLang()
   const [hover, setHover] = useState<string | null>(null)
-  const { path, project } = useMemo(() => {
+  const { path, project, invert } = useMemo(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const projection = geoMercator().fitExtent(
       [
@@ -36,13 +40,32 @@ export function SudanMap({
       ],
       sudan as any,
     )
-    return { path: geoPath(projection)(sudan as any) ?? '', project: (lon: number, lat: number) => projection([lon, lat])! }
+    return {
+      path: geoPath(projection)(sudan as any) ?? '',
+      project: (lon: number, lat: number) => projection([lon, lat])!,
+      invert: (x: number, y: number) => projection.invert!([x, y])!,
+    }
   }, [])
 
   const labelled = new Set([offices.find((o) => o.isHQ)?.id, selected, hover].filter(Boolean) as string[])
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={lang === 'ar' ? 'خريطة مكاتب السودان' : 'Map of Sudan offices'}>
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className={`h-auto w-full ${onPick ? 'cursor-crosshair' : ''}`}
+      role="img"
+      aria-label={lang === 'ar' ? 'خريطة مكاتب السودان' : 'Map of Sudan offices'}
+      onClick={(e) => {
+        if (!onPick) return
+        const svg = e.currentTarget
+        const pt = svg.createSVGPoint()
+        pt.x = e.clientX
+        pt.y = e.clientY
+        const p = pt.matrixTransform(svg.getScreenCTM()!.inverse())
+        const [lon, lat] = invert(p.x, p.y)
+        onPick(Math.round(lon * 100) / 100, Math.round(lat * 100) / 100)
+      }}
+    >
       <defs>
         <pattern id="dots" width="9" height="9" patternUnits="userSpaceOnUse">
           <circle cx="1.5" cy="1.5" r="1" fill="var(--color-line)" />
@@ -100,6 +123,12 @@ export function SudanMap({
         strokeLinecap="round"
       />
 
+      {pick && (
+        <g transform={`translate(${project(pick[0], pick[1]).join(',')})`}>
+          <circle r={14} fill="var(--color-crescent)" opacity={0.18} />
+          <circle r={7} fill="var(--color-crescent)" stroke="white" strokeWidth={2.5} />
+        </g>
+      )}
       {offices.map((o) => {
         const [x, y] = project(o.lon, o.lat)
         const st = status[o.id] ?? 'good'
@@ -111,7 +140,10 @@ export function SudanMap({
             className="cursor-pointer"
             onMouseEnter={() => setHover(o.id)}
             onMouseLeave={() => setHover(null)}
-            onClick={() => onSelect(o.id)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onSelect(o.id)
+            }}
             tabIndex={0}
             role="button"
             aria-label={o.name[lang]}

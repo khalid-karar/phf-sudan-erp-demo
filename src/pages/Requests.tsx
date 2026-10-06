@@ -3,12 +3,12 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PayModal } from '../components/PayModal'
 import { Button, PageHeader, Panel, StatusBadge, UsageBar } from '../components/ui'
-import { offices, roleNames, users } from '../data/seed'
+import { roleNames } from '../data/seed'
 import type { ApprovalStep, RequestStatus } from '../data/types'
 import { findLine, lineUsage } from '../lib/budget'
 import { date, money, usd } from '../lib/format'
 import { useLang, useT } from '../lib/i18n'
-import { useStore, useUser } from '../lib/store'
+import { getOffices, getUsers, usePerm, useStore, useUser } from '../lib/store'
 
 export function RequestsList() {
   const lang = useLang()
@@ -17,15 +17,17 @@ export function RequestsList() {
   const s = useStore()
   const nav = useNavigate()
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all')
-  const rows = s.requests.filter((r) => filter === 'all' || r.status === filter).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-  const counts = (st: RequestStatus) => s.requests.filter((r) => r.status === st).length
+  const { scopeOffice, can } = usePerm()
+  const scoped = s.requests.filter((r) => !scopeOffice || r.officeId === scopeOffice)
+  const rows = scoped.filter((r) => filter === 'all' || r.status === filter).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+  const counts = (st: RequestStatus) => scoped.filter((r) => r.status === st).length
 
   return (
     <div>
       <PageHeader
         title={ar ? 'طلبات الصرف' : 'Spend requests'}
         actions={
-          <Button onClick={() => nav('/requests/new')}>
+          can('projects', 'edit') && <Button onClick={() => nav('/requests/new')}>
             <Plus size={16} /> {t('newRequest')}
           </Button>
         }
@@ -37,7 +39,7 @@ export function RequestsList() {
             onClick={() => setFilter(f)}
             className={`h-9 rounded-md px-3 text-[13.5px] ${filter === f ? 'bg-nile text-white' : 'border border-line bg-surface text-muted hover:text-ink'}`}
           >
-            {f === 'all' ? (ar ? 'الكل' : 'All') : t(`st_${f}`)} <span className="num opacity-70">{f === 'all' ? s.requests.length : counts(f)}</span>
+            {f === 'all' ? (ar ? 'الكل' : 'All') : t(`st_${f}`)} <span className="num opacity-70">{f === 'all' ? scoped.length : counts(f)}</span>
           </button>
         ))}
       </div>
@@ -68,7 +70,7 @@ export function RequestsList() {
                   <td className="px-3 py-3 whitespace-nowrap">
                     <span className="num text-muted">{f?.project.code}</span> {f?.line.code}
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap">{offices.find((o) => o.id === r.officeId)?.name[lang]}</td>
+                  <td className="px-3 py-3 whitespace-nowrap">{getOffices().find((o) => o.id === r.officeId)?.name[lang]}</td>
                   <td className="num px-3 py-3 text-end whitespace-nowrap">
                     {money(r.amount, r.currency, lang)}
                     {r.currency === 'SDG' && <span className="block text-[12px] text-muted">{usd(r.amountUSD)}</span>}
@@ -91,7 +93,7 @@ export function RequestsList() {
 export function ApprovalTimeline({ steps, createdAt, requesterId }: { steps: ApprovalStep[]; createdAt: string; requesterId: string }) {
   const lang = useLang()
   const ar = lang === 'ar'
-  const requester = users.find((u) => u.id === requesterId)
+  const requester = getUsers().find((u) => u.id === requesterId)
   const items = [
     { key: 'created', icon: <Check size={14} />, cls: 'bg-nile text-white', title: ar ? 'أُنشئ الطلب' : 'Request created', who: requester?.name[lang], at: createdAt, note: undefined as string | undefined },
     ...steps.map((st, i) => ({
@@ -106,7 +108,7 @@ export function ApprovalTimeline({ steps, createdAt, requesterId }: { steps: App
               ? 'bg-amber text-white'
               : 'bg-paper text-muted ring-1 ring-line',
       title: roleNames[st.role][lang],
-      who: st.by ? users.find((u) => u.id === st.by)?.name[lang] : st.status === 'pending' ? (ar ? 'بانتظار القرار' : 'Waiting for decision') : ar ? 'لم يصل بعد' : 'Not reached yet',
+      who: st.by ? getUsers().find((u) => u.id === st.by)?.name[lang] : st.status === 'pending' ? (ar ? 'بانتظار القرار' : 'Waiting for decision') : ar ? 'لم يصل بعد' : 'Not reached yet',
       at: st.at,
       note: st.note,
     })),
@@ -140,13 +142,14 @@ export function RequestDetail() {
   const user = useUser()
   const [note, setNote] = useState('')
   const [paying, setPaying] = useState(false)
+  const perm = usePerm()
   const r = s.requests.find((x) => x.id === id)
   if (!r) return <p>{ar ? 'الطلب غير موجود' : 'Request not found'}</p>
   const f = findLine(s.projects, r.lineId)!
   const lu = lineUsage(f.line, s)
   const myTurn = r.status === 'pending' && r.steps.some((st) => st.status === 'pending' && st.role === user.role)
-  const canPay = r.status === 'approved' && user.role === 'finance_manager'
-  const office = offices.find((o) => o.id === r.officeId)!
+  const canPay = r.status === 'approved' && perm.can('finance', 'edit')
+  const office = getOffices().find((o) => o.id === r.officeId)!
 
   return (
     <div>
@@ -172,7 +175,7 @@ export function RequestDetail() {
               <Item k={t('project')} v={f.project.name[lang]} sub={f.project.code} />
               <Item k={`${t('pillar')} / ${t('line')}`} v={`${f.line.code} ${f.line.name[lang]}`} sub={`${f.pillar.code}. ${f.pillar.name[lang]}`} />
               <Item k={ar ? 'رقم النشاط' : 'Activity'} v={<span className="num">{r.activityCode ?? '—'}</span>} sub={ar ? 'يُطابق مع التقرير الفني' : 'Matched to the field report'} />
-              <Item k={ar ? 'مقدّم الطلب' : 'Requested by'} v={users.find((u) => u.id === r.requesterId)?.name[lang]} sub={date(r.createdAt, lang)} />
+              <Item k={ar ? 'مقدّم الطلب' : 'Requested by'} v={getUsers().find((u) => u.id === r.requesterId)?.name[lang]} sub={date(r.createdAt, lang)} />
             </dl>
             {r.overCeiling && (
               <p className="mt-4 rounded-md bg-amber-soft px-3 py-2 text-[13.5px] text-amber">

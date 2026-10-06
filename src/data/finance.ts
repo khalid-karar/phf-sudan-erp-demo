@@ -20,7 +20,9 @@ import type {
 // ---------------------------------------------------------------------------
 
 const officeCode = (id: string) => String(offices.findIndex((o) => o.id === id) + 1).padStart(2, '0')
-export const cashAccount = (officeId: string) => `1101-${officeCode(officeId)}`
+/** Cash box account of an office. Pass the live accounts list once offices can be added at runtime. */
+export const cashAccount = (officeId: string, accts?: Account[]) =>
+  (accts ?? accounts).find((a) => a.parent === '1101' && a.officeId === officeId)?.code ?? `1101-${officeCode(officeId)}`
 export const BANK_SDG = '1102-01'
 export const BANK_USD = '1102-02'
 export const BANK_PTS = '1102-03'
@@ -42,7 +44,7 @@ export const accounts: Account[] = [
   A('11', '1', 'الأصول المتداولة', 'Current assets', 'asset', false),
   A('1101', '11', 'النقدية بصناديق المكاتب', 'Office cash boxes', 'asset', false),
   ...offices.map((o) =>
-    A(cashAccount(o.id), '1101', `صندوق ${o.isHQ ? 'الرئاسة' : `مكتب ${o.name.ar}`}`, `${o.isHQ ? 'HQ' : o.name.en} cash box`, 'asset', true, { currency: 'SDG', officeId: o.id }),
+    A(`1101-${officeCode(o.id)}`, '1101', `صندوق ${o.isHQ ? 'الرئاسة' : `مكتب ${o.name.ar}`}`, `${o.isHQ ? 'HQ' : o.name.en} cash box`, 'asset', true, { currency: 'SDG', officeId: o.id }),
   ),
   A('1102', '11', 'النقدية بالبنوك', 'Cash at bank', 'asset', false),
   A(BANK_SDG, '1102', 'بنك الخرطوم — جاري بالجنيه', 'Bank of Khartoum — SDG current', 'asset', true, { currency: 'SDG', officeId: 'khr' }),

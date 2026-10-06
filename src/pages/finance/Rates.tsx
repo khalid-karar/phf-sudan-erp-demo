@@ -3,14 +3,16 @@ import { Button, PageHeader, Panel } from '../../components/ui'
 import { date, num, usd } from '../../lib/format'
 import { revaluation } from '../../lib/ledger'
 import { useLang } from '../../lib/i18n'
-import { useStore, useUser } from '../../lib/store'
+import { usePerm, useStore, useUser } from '../../lib/store'
 
 export function Rates() {
   const lang = useLang()
   const ar = lang === 'ar'
   const s = useStore()
   const user = useUser()
-  const isFM = user.role === 'finance_manager'
+  const { can } = usePerm()
+  void user
+  const isFM = can('finance', 'manage')
   const current = s.rates[s.rates.length - 1]
   const first = s.rates[0]
   const [input, setInput] = useState(current.rate)

@@ -2,12 +2,11 @@ import { CheckCircle2, Printer } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button, PageHeader, Panel, UsageBar } from '../../components/ui'
 import { cashAccount, staff } from '../../data/finance'
-import { offices } from '../../data/seed'
 import { lineUsage, pillarUsage, projectUsage } from '../../lib/budget'
 import { num, usd } from '../../lib/format'
 import { balances } from '../../lib/ledger'
 import { useLang } from '../../lib/i18n'
-import { useStore } from '../../lib/store'
+import { getOffices, useStore } from '../../lib/store'
 import { Tabs } from './common'
 
 export function FinanceReports() {
@@ -62,7 +61,7 @@ function TrialBalance() {
       <div className="flex flex-wrap gap-3 border-b border-line px-5 py-3">
         <select className="h-10 rounded-md border border-line bg-surface px-2 text-[14px]" value={office} onChange={(e) => setOffice(e.target.value)}>
           <option value="">{ar ? 'كل المكاتب' : 'All offices'}</option>
-          {offices.map((o) => (
+          {getOffices().map((o) => (
             <option key={o.id} value={o.id}>
               {o.name[lang]}
             </option>
@@ -223,8 +222,8 @@ function CashPosition() {
   const rate = s.rates[s.rates.length - 1].rate
   const bal = useMemo(() => balances(s.accounts, s.journal), [s.accounts, s.journal])
   const banks = s.accounts.filter((a) => a.postable && a.code.startsWith('1102'))
-  const rows = offices.map((o) => {
-    const box = bal.get(cashAccount(o.id))!
+  const rows = getOffices().map((o) => {
+    const box = bal.get(cashAccount(o.id, s.accounts)) ?? { sdg: 0, balance: 0, debit: 0, credit: 0 }
     const officeBanks = banks.filter((b) => b.officeId === o.id)
     const bankUSD = officeBanks.reduce((t, b) => {
       const v = bal.get(b.code)!

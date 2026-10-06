@@ -2,11 +2,11 @@ import { Check, Shuffle, X } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, PageHeader, Panel, UsageBar } from '../components/ui'
-import { offices, roleNames } from '../data/seed'
+import { roleNames } from '../data/seed'
 import { findLine, lineUsage } from '../lib/budget'
 import { date, money, relDays, usd } from '../lib/format'
 import { useLang } from '../lib/i18n'
-import { useStore, useUser } from '../lib/store'
+import { getOffices, usePerm, useStore, useUser } from '../lib/store'
 
 export function Approvals() {
   const lang = useLang()
@@ -14,7 +14,8 @@ export function Approvals() {
   const s = useStore()
   const user = useUser()
   const mine = (steps: { role: string; status: string }[]) => steps.some((st) => st.status === 'pending' && st.role === user.role)
-  const reqs = s.requests.filter((r) => r.status === 'pending' && mine(r.steps))
+  const { scopeOffice } = usePerm()
+  const reqs = s.requests.filter((r) => r.status === 'pending' && mine(r.steps) && (!scopeOffice || r.officeId === scopeOffice))
   const ras = s.reallocations.filter((r) => r.status === 'pending' && mine(r.steps))
   const empty = reqs.length + ras.length === 0
 
@@ -91,7 +92,7 @@ export function Approvals() {
                         {r.code}
                       </Link>
                       {ar ? '، ' : ', '}
-                      {offices.find((o) => o.id === r.officeId)?.name[lang]}
+                      {getOffices().find((o) => o.id === r.officeId)?.name[lang]}
                       {ar ? '، ' : ', '}
                       {relDays(r.createdAt, lang)}
                     </div>

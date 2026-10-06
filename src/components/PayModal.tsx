@@ -28,7 +28,7 @@ export function PayModal({ req, open, onClose }: { req: SpendRequest; open: bool
   ]
 
   const account =
-    method === 'cash' || method === 'advance' ? cashAccount(req.officeId) : req.currency === 'USD' && method === 'bank' ? BANK_USD : req.officeId === 'pts' && method === 'bank' ? BANK_PTS : BANK_SDG
+    method === 'cash' || method === 'advance' ? cashAccount(req.officeId, s.accounts) : req.currency === 'USD' && method === 'bank' ? BANK_USD : req.officeId === 'pts' && method === 'bank' ? BANK_PTS : BANK_SDG
   const debitAcc = method === 'advance' ? ADVANCES : s.lineMap[req.lineId]
   const accName = (code: string) => s.accounts.find((a) => a.code === code)?.name[lang]
 

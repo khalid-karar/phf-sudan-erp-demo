@@ -1,17 +1,16 @@
 import { CheckCircle2, Lock, XCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button, PageHeader, Panel } from '../../components/ui'
-import { offices, users } from '../../data/seed'
 import { date } from '../../lib/format'
 import { closingPeriod } from '../../lib/ledger'
 import { useLang } from '../../lib/i18n'
-import { useStore, useUser } from '../../lib/store'
+import { getOffices, getUsers, usePerm, useStore, useUser } from '../../lib/store'
 import { activityFor } from './Advances'
 
 export function useCloseChecks() {
   const s = useStore()
   const { start, end } = closingPeriod()
-  return offices.map((o) => {
+  return getOffices().map((o) => {
     const c = s.closes.find((x) => x.officeId === o.id)!
     const lateAdv = s.advances.filter((a) => a.officeId === o.id && a.status === 'open' && +new Date(a.dueAt) <= +new Date(end))
     const unmatched = s.expenses.filter((e) => e.officeId === o.id && !e.hasTechReport && +new Date(e.date) >= +new Date(start) && +new Date(e.date) <= +new Date(end))
@@ -31,7 +30,9 @@ export function Close() {
   const ar = lang === 'ar'
   const s = useStore()
   const user = useUser()
-  const isFM = user.role === 'finance_manager'
+  const { can } = usePerm()
+  void user
+  const isFM = can('finance', 'manage')
   const rows = useCloseChecks()
   const { start } = closingPeriod()
   const month = new Intl.DateTimeFormat(ar ? 'ar-SD-u-nu-latn' : 'en-GB', { month: 'long', year: 'numeric' }).format(new Date(start))
@@ -95,7 +96,7 @@ export function Close() {
                   {close.closedAt ? (
                     <span className="inline-flex items-center gap-1.5 text-[13.5px] text-muted">
                       <Lock size={15} /> {ar ? 'مُقفل' : 'Closed'} <span className="num">{date(close.closedAt, lang)}</span>
-                      <span className="hidden xl:inline">— {users.find((u) => u.id === close.closedBy)?.name[lang]}</span>
+                      <span className="hidden xl:inline">— {getUsers().find((u) => u.id === close.closedBy)?.name[lang]}</span>
                     </span>
                   ) : (
                     <Button className="h-9" variant={ready ? 'primary' : 'quiet'} disabled={!ready || !isFM} onClick={() => s.closeMonth(office.id)}>
