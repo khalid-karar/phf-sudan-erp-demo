@@ -457,3 +457,86 @@ export interface SentReport {
   at: string
   by: string
 }
+
+// --- Supply chain & logistics ------------------------------------------------
+
+export type ItemCategory = 'nutrition' | 'medicine' | 'medical_supply' | 'equipment'
+
+export interface Item {
+  id: string
+  code: string
+  name: Bi
+  unit: Bi
+  category: ItemCategory
+  unitValueUSD: number
+  min: number // minimum level per store; below it triggers an alert
+  active?: boolean
+}
+
+export interface StockLevel {
+  itemId: string
+  officeId: string
+  qty: number
+}
+
+export type MoveKind = 'receipt' | 'issue' | 'transfer_out' | 'transfer_in' | 'loss'
+
+export interface StockMove {
+  id: string
+  no: string
+  kind: MoveKind
+  date: string
+  itemId: string
+  officeId: string
+  qty: number // always positive; the kind gives the direction
+  valueUSD: number
+  ref?: string // shipment, activity or receipt number
+  source?: Bi // donor or sender for receipts
+  activityId?: string
+  expiry?: string
+  by?: string
+}
+
+export interface ShipmentLine {
+  itemId: string
+  qty: number
+  received?: number
+}
+
+export interface Shipment {
+  id: string
+  no: string
+  fromOfficeId: string
+  toOfficeId: string
+  lines: ShipmentLine[]
+  vehicleId?: string
+  driver?: string
+  status: 'preparing' | 'in_transit' | 'delivered'
+  createdAt: string
+  departedAt?: string
+  deliveredAt?: string
+  receivedBy?: string
+  note?: string
+}
+
+export interface FuelLog {
+  id: string
+  date: string
+  liters: number
+  costSDG: number
+  odometer: number
+  officeId: string
+}
+
+export interface Vehicle {
+  id: string
+  plate: string
+  model: Bi
+  kind: 'pickup' | 'suv' | 'truck' | 'ambulance'
+  officeId: string
+  driver: Bi
+  status: 'available' | 'on_trip' | 'maintenance'
+  odometer: number
+  fuel: FuelLog[]
+  nextServiceKm: number
+}

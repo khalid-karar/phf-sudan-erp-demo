@@ -25,6 +25,8 @@ import { Organization } from './pages/settings/Organization'
 import { Roles } from './pages/settings/Roles'
 import { Users } from './pages/settings/Users'
 import { Upcoming } from './pages/Upcoming'
+import { Issues, Items, Receipts, Stock } from './pages/supply/Supply'
+import { Fleet, Shipments } from './pages/supply/Logistics'
 import { DonorReport } from './pages/reports/DonorReport'
 import { HqReport } from './pages/reports/HqReport'
 import { SentReports } from './pages/reports/SentReports'
@@ -66,6 +68,12 @@ const routes: [string, React.ReactNode][] = [
   ['/reports/hq', <HqReport />],
   ['/reports/donor', <DonorReport />],
   ['/reports/sent', <SentReports />],
+  ['/supply', <Stock />],
+  ['/supply/receipts', <Receipts />],
+  ['/supply/issues', <Issues />],
+  ['/supply/items', <Items />],
+  ['/logistics', <Shipments />],
+  ['/logistics/fleet', <Fleet />],
   ['/alerts', <Inbox />],
   ['/alerts/calendar', <Calendar />],
 ]

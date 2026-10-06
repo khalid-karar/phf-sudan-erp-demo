@@ -79,7 +79,8 @@ export function Dashboard() {
   const cashCommitted = s.requests.filter((r) => r.status === 'approved').reduce((a, r) => a + r.amountUSD, 0)
   const cash = funds[0]
   const inkind = funds[1]
-  const inkindIssued = 121_300
+  const inkindReceived = s.stockMoves.filter((m) => m.kind === 'receipt').reduce((t, m) => t + m.valueUSD, 0)
+  const inkindIssued = s.stockMoves.filter((m) => m.kind === 'issue').reduce((t, m) => t + m.valueUSD, 0)
 
   const hour = new Date().getHours()
   const greet = ar ? (hour < 12 ? 'صباح الخير' : 'مساء الخير') : hour < 12 ? 'Good morning' : 'Good afternoon'
@@ -153,7 +154,7 @@ export function Dashboard() {
         <FundBlock
           title={inkind.name[lang]}
           route={inkind.donor[lang]}
-          received={inkind.receivedUSD}
+          received={inkindReceived}
           parts={[{ v: inkindIssued, label: ar ? 'صُرف للمكاتب' : 'Issued to offices', cls: 'bg-nile' }]}
           note={ar ? 'القيمة التقديرية للمواد العينية' : 'Estimated value of in-kind goods'}
         />

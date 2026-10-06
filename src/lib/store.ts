@@ -13,10 +13,18 @@ import {
   FX_GAIN,
   FX_LOSS,
   fieldActivities as seedActivities,
+  rateOn,
   rates as seedRates,
   staff,
 } from '../data/finance'
 import type {
+  Item,
+  Shipment,
+  ShipmentLine,
+  StockLevel,
+  StockMove,
+  Vehicle,
+  FuelLog,
   HqDraft,
   ReportSettings,
   SentReport,
@@ -56,6 +64,7 @@ import type {
 } from '../data/types'
 import { checkCeiling, findLine, routeApproval } from './budget'
 import { revaluation } from './ledger'
+import { buildSupply, categoryAccount, INKIND_REVENUE, INVENTORY, items as seedItems } from '../data/supply'
 import { defaultChannels, defaultRules, runEngine, testChannel } from './notify'
 
 export interface Toast {
@@ -72,6 +81,22 @@ interface State {
   users: User[]
   roles: Role[]
   sidebarCollapsed: boolean
+  items: Item[]
+  stock: StockLevel[]
+  stockMoves: StockMove[]
+  shipments: Shipment[]
+  vehicles: Vehicle[]
+  saveItem: (i: Item) => void
+  receiveSupplies: (d: { officeId: string; source: string; lines: { itemId: string; qty: number; expiry?: string }[] }) => string
+  issueSupplies: (d: { officeId: string; activityId?: string; note?: string; lines: { itemId: string; qty: number }[] }) => string | null
+  createShipment: (d: { fromOfficeId: string; toOfficeId: string; vehicleId?: string; driver?: string; note?: string; lines: ShipmentLine[] }) => Shipment
+  dispatchShipment: (id: string) => boolean
+  receiveShipment: (id: string, received: Record<string, number>) => void
+  saveVehicle: (v: Vehicle) => void
+  addFuel: (vehicleId: string, f: Omit<FuelLog, 'id'>) => void
+  lowStockCount: () => number
+  qtyOf: (itemId: string, officeId: string) => number
+
   reportSettings: ReportSettings
   hqDrafts: HqDraft[]
   sentReports: SentReport[]
@@ -192,7 +217,16 @@ const fresh = () => {
   const s = buildSeed()
   const lineMap = defaultLineMap()
   const f = buildFinance(s.expenses, lineMap)
+  const sup = buildSupply(seedActivities, (iso) => rateOn(iso))
+  const journal = [...f.journal, ...sup.journal].sort((a, b) => +new Date(a.date) - +new Date(b.date))
+  journal.forEach((e, i) => (e.no = `JE-${String(i + 1).padStart(4, '0')}`))
+  f.journal = journal
   return {
+    items: structuredClone(seedItems),
+    stock: sup.stock,
+    stockMoves: sup.moves,
+    shipments: sup.shipments,
+    vehicles: sup.vehicles,
     reportSettings: structuredClone(defaultReportSettings),
     hqDrafts: [] as HqDraft[],
     sentReports: [] as SentReport[],
@@ -213,7 +247,7 @@ const fresh = () => {
     advances: f.advances,
     rates: structuredClone(seedRates),
     closes: f.closes,
-    fseq: { je: f.journal.length + 1, pv: f.nextPv, rv: f.nextRv, adv: 22 },
+    fseq: { je: journal.length + 1, pv: f.nextPv, rv: f.nextRv, adv: 22 },
     projects: structuredClone(seedProjects),
     expenses: [...f.extraExpenses, ...s.expenses].map((e) =>
       e.id === 'ex-4-0' ? { ...e, activityCode: 'ACT-KSL-0135' } : e.id === 'ex-17-1' ? { ...e, activityCode: 'ACT-PTS-0047' } : e,
@@ -274,6 +308,17 @@ const decide = (steps: ApprovalStep[], userId: string, approve: boolean, note?: 
 }
 
 type SetFn = (p: Partial<State> | ((s: State) => Partial<State>)) => void
+
+function applyMoves(stock: StockLevel[], moves: StockMove[]) {
+  const next = stock.map((x) => ({ ...x }))
+  for (const m of moves) {
+    const sign = m.kind === 'receipt' || m.kind === 'transfer_in' ? 1 : -1
+    const row = next.find((x) => x.itemId === m.itemId && x.officeId === m.officeId)
+    if (row) row.qty += sign * m.qty
+    else next.push({ itemId: m.itemId, officeId: m.officeId, qty: sign * m.qty })
+  }
+  return next
+}
 
 /** Attaches a field report to its activity and marks the activity's spending as matched. */
 function applyReport(set: SetFn, get: () => State, activityId: string, report: FieldReport, quiet = false) {
@@ -577,6 +622,158 @@ export const useStore = create<State>()(
   },
 
 
+
+  // ---- supply chain & logistics -------------------------------------------
+  qtyOf: (itemId, officeId) => get().stock.find((x) => x.itemId === itemId && x.officeId === officeId)?.qty ?? 0,
+  lowStockCount: () => {
+    const s = get()
+    return s.stock.filter((x) => {
+      const it = s.items.find((i) => i.id === x.itemId)
+      return it && it.active !== false && x.qty < it.min
+    }).length
+  },
+  saveItem: (i) => {
+    const s = get()
+    const exists = s.items.some((x) => x.id === i.id)
+    set({ items: exists ? s.items.map((x) => (x.id === i.id ? i : x)) : [...s.items, i] })
+    get().toast({ ar: `حُفظ الصنف ${i.name.ar}`, en: `${i.name.en} saved` })
+  },
+  receiveSupplies: (d) => {
+    const s = get()
+    const now = new Date().toISOString()
+    const ref = `GRN-${String(s.stockMoves.length + 1).padStart(4, '0')}`
+    const moves: StockMove[] = d.lines.map((l, i) => {
+      const it = s.items.find((x) => x.id === l.itemId)!
+      return { id: `mv-n${Date.now()}-${i}`, no: ref, kind: 'receipt', date: now, itemId: l.itemId, officeId: d.officeId, qty: l.qty, valueUSD: Math.round(l.qty * it.unitValueUSD * 100) / 100, ref, source: { ar: d.source, en: d.source }, expiry: l.expiry, by: s.userId }
+    })
+    const total = moves.reduce((t, m) => t + m.valueUSD, 0)
+    const je: JournalEntry = {
+      id: `je-n${s.fseq.je}`,
+      no: `JE-${String(s.fseq.je).padStart(4, '0')}`,
+      date: now,
+      memo: { ar: `استلام تغذية عينية ${ref} — ${d.source}`, en: `In-kind receipt ${ref} — ${d.source}` },
+      source: 'transfer',
+      ref,
+      lines: [
+        { account: INVENTORY, debit: total, credit: 0, officeId: d.officeId },
+        { account: INKIND_REVENUE, debit: 0, credit: total },
+      ],
+    }
+    set({ stockMoves: [...moves, ...s.stockMoves], stock: applyMoves(s.stock, moves), journal: [...s.journal, je], fseq: { ...s.fseq, je: s.fseq.je + 1 } })
+    get().toast({ ar: `سُجّل الاستلام ${ref} بقيمة $${Math.round(total).toLocaleString('en-US')} وأُضيف للمخزون`, en: `Receipt ${ref} worth $${Math.round(total).toLocaleString('en-US')} added to stock` })
+    return ref
+  },
+  issueSupplies: (d) => {
+    const s = get()
+    for (const l of d.lines) if (l.qty > (s.stock.find((x) => x.itemId === l.itemId && x.officeId === d.officeId)?.qty ?? 0)) return null
+    const now = new Date().toISOString()
+    const act = s.activities.find((a) => a.id === d.activityId)
+    const ref = `ISS-${String(s.stockMoves.length + 1).padStart(4, '0')}`
+    const moves: StockMove[] = d.lines.map((l, i) => {
+      const it = s.items.find((x) => x.id === l.itemId)!
+      return { id: `mv-n${Date.now()}-${i}`, no: ref, kind: 'issue', date: now, itemId: l.itemId, officeId: d.officeId, qty: l.qty, valueUSD: Math.round(l.qty * it.unitValueUSD * 100) / 100, ref: act?.code ?? d.note, activityId: act?.id, by: s.userId }
+    })
+    const byAcc = new Map<string, number>()
+    for (const m of moves) {
+      const acc = categoryAccount[s.items.find((x) => x.id === m.itemId)!.category]
+      byAcc.set(acc, (byAcc.get(acc) ?? 0) + m.valueUSD)
+    }
+    const total = moves.reduce((t, m) => t + m.valueUSD, 0)
+    const je: JournalEntry = {
+      id: `je-n${s.fseq.je}`,
+      no: `JE-${String(s.fseq.je).padStart(4, '0')}`,
+      date: now,
+      memo: { ar: `صرف مواد عينية ${ref}${act ? ` — ${act.code}` : ''}`, en: `In-kind issue ${ref}${act ? ` — ${act.code}` : ''}` },
+      source: 'transfer',
+      ref,
+      lines: [
+        ...[...byAcc].map(([account, v]) => ({ account, debit: v, credit: 0, officeId: d.officeId, projectId: act?.projectId, lineId: act?.lineId })),
+        { account: INVENTORY, debit: 0, credit: total, officeId: d.officeId },
+      ],
+    }
+    set({ stockMoves: [...moves, ...s.stockMoves], stock: applyMoves(s.stock, moves), journal: [...s.journal, je], fseq: { ...s.fseq, je: s.fseq.je + 1 } })
+    get().toast({ ar: `صُرفت المواد ${ref}${act ? ` للنشاط ${act.code}` : ''}`, en: `Stock issued ${ref}${act ? ` to ${act.code}` : ''}` })
+    return ref
+  },
+  createShipment: (d) => {
+    const s = get()
+    const n = s.shipments.length + 21
+    const sh: Shipment = { id: `sh-n${Date.now()}`, no: `SHP-${String(n).padStart(4, '0')}`, ...d, status: 'preparing', createdAt: new Date().toISOString() }
+    set({ shipments: [sh, ...s.shipments] })
+    get().toast({ ar: `أُنشئت الشحنة ${sh.no}`, en: `Shipment ${sh.no} created` })
+    return sh
+  },
+  dispatchShipment: (id) => {
+    const s = get()
+    const sh = s.shipments.find((x) => x.id === id)
+    if (!sh || sh.status !== 'preparing') return false
+    for (const l of sh.lines) if (l.qty > (s.stock.find((x) => x.itemId === l.itemId && x.officeId === sh.fromOfficeId)?.qty ?? 0)) {
+      get().toast({ ar: 'الرصيد في مخزن الإرسال لا يكفي لهذه الشحنة', en: 'Not enough stock at the sending store' }, 'bad')
+      return false
+    }
+    const now = new Date().toISOString()
+    const moves: StockMove[] = sh.lines.map((l, i) => ({ id: `mv-n${Date.now()}-${i}`, no: sh.no, kind: 'transfer_out', date: now, itemId: l.itemId, officeId: sh.fromOfficeId, qty: l.qty, valueUSD: Math.round(l.qty * s.items.find((x) => x.id === l.itemId)!.unitValueUSD * 100) / 100, ref: sh.no, by: s.userId }))
+    set({
+      shipments: s.shipments.map((x) => (x.id === id ? { ...x, status: 'in_transit', departedAt: now } : x)),
+      stockMoves: [...moves, ...s.stockMoves],
+      stock: applyMoves(s.stock, moves),
+      vehicles: s.vehicles.map((v) => (v.id === sh.vehicleId ? { ...v, status: 'on_trip' } : v)),
+    })
+    get().toast({ ar: `انطلقت الشحنة ${sh.no} — يُبلَّغ المكتب المستلم`, en: `${sh.no} dispatched — the receiving office is notified` })
+    return true
+  },
+  receiveShipment: (id, received) => {
+    const s = get()
+    const sh = s.shipments.find((x) => x.id === id)
+    if (!sh || sh.status !== 'in_transit') return
+    const now = new Date().toISOString()
+    const lines = sh.lines.map((l) => ({ ...l, received: Math.max(0, Math.min(l.qty, received[l.itemId] ?? l.qty)) }))
+    const moves: StockMove[] = lines.map((l, i) => ({ id: `mv-n${Date.now()}-${i}`, no: sh.no, kind: 'transfer_in', date: now, itemId: l.itemId, officeId: sh.toOfficeId, qty: l.received!, valueUSD: Math.round(l.received! * s.items.find((x) => x.id === l.itemId)!.unitValueUSD * 100) / 100, ref: sh.no, by: s.userId }))
+    const lost = lines.reduce((t, l) => t + (l.qty - l.received!) * s.items.find((x) => x.id === l.itemId)!.unitValueUSD, 0)
+    const extra: Partial<State> = {}
+    if (lost > 0) {
+      extra.journal = [
+        ...s.journal,
+        {
+          id: `je-n${s.fseq.je}`,
+          no: `JE-${String(s.fseq.je).padStart(4, '0')}`,
+          date: now,
+          memo: { ar: `نقص عند استلام الشحنة ${sh.no}`, en: `Shortage on receiving ${sh.no}` },
+          source: 'transfer',
+          ref: sh.no,
+          lines: [
+            { account: '5299', debit: lost, credit: 0, officeId: sh.toOfficeId },
+            { account: INVENTORY, debit: 0, credit: lost, officeId: sh.fromOfficeId },
+          ],
+        },
+      ]
+      extra.fseq = { ...s.fseq, je: s.fseq.je + 1 }
+    }
+    set({
+      ...extra,
+      shipments: s.shipments.map((x) => (x.id === id ? { ...x, lines, status: 'delivered', deliveredAt: now, receivedBy: s.userId } : x)),
+      stockMoves: [...moves, ...s.stockMoves],
+      stock: applyMoves(s.stock, moves),
+      vehicles: s.vehicles.map((v) => (v.id === sh.vehicleId ? { ...v, status: 'available' } : v)),
+    })
+    get().toast(
+      lost > 0
+        ? { ar: `استُلمت الشحنة ${sh.no} مع نقص بقيمة $${Math.round(lost)} — سُجّل قيد بالفرق`, en: `${sh.no} received with a $${Math.round(lost)} shortage — an entry was posted` }
+        : { ar: `استُلمت الشحنة ${sh.no} كاملة وأُضيفت لمخزن المكتب`, en: `${sh.no} received in full and added to the office store` },
+      lost > 0 ? 'warn' : 'ok',
+    )
+  },
+  saveVehicle: (v) => {
+    const s = get()
+    const exists = s.vehicles.some((x) => x.id === v.id)
+    set({ vehicles: exists ? s.vehicles.map((x) => (x.id === v.id ? v : x)) : [...s.vehicles, v] })
+    get().toast({ ar: `حُفظت المركبة ${v.plate}`, en: `Vehicle ${v.plate} saved` })
+  },
+  addFuel: (vehicleId, f) => {
+    set((s) => ({ vehicles: s.vehicles.map((v) => (v.id === vehicleId ? { ...v, odometer: Math.max(v.odometer, f.odometer), fuel: [...v.fuel, { ...f, id: `f-${Date.now()}` }] } : v)) }))
+    get().toast({ ar: 'سُجّلت تعبئة الوقود', en: 'Fuel fill-up recorded' })
+  },
+
   // ---- finance ------------------------------------------------------------
   issuePayment: (requestId, method, staffId) => {
     const s = get()
@@ -800,7 +997,7 @@ export const useStore = create<State>()(
     set((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, controlMode: mode, tolerancePct } : p)) })),
   }),
   {
-    name: 'phf-erp-demo-v7',
+    name: 'phf-erp-demo-v8',
     storage: createJSONStorage(() => safeStorage),
     partialize: (s) => {
       const { toasts: _t, ...rest } = s
