@@ -418,3 +418,42 @@ export interface ChannelConfig {
     lastTest?: ChannelTest
   }
 }
+
+// --- Reports -------------------------------------------------------------------
+
+export interface ReportDelivery {
+  to: string[]
+  cc: string[]
+  subject: Bi
+  body: Bi
+}
+
+export interface ReportSettings {
+  hq: ReportDelivery & { requireApproval: boolean; approverRole: string; autoSendDay: number | null; includeSections: Record<string, boolean> }
+  donor: Record<string, ReportDelivery> // per project
+}
+
+export interface HqDraft {
+  period: string // YYYY-MM
+  summary?: Bi
+  challenges?: Bi
+  plan?: Bi
+  status: 'draft' | 'approved' | 'sent'
+  approvedBy?: string
+  approvedAt?: string
+}
+
+export interface SentReport {
+  id: string
+  kind: 'hq' | 'donor'
+  title: Bi
+  period: string
+  projectId?: string
+  to: string[]
+  cc: string[]
+  subject: string
+  fileName: string
+  sizeKB: number
+  at: string
+  by: string
+}

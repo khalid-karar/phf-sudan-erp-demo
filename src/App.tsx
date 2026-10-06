@@ -25,6 +25,10 @@ import { Organization } from './pages/settings/Organization'
 import { Roles } from './pages/settings/Roles'
 import { Users } from './pages/settings/Users'
 import { Upcoming } from './pages/Upcoming'
+import { DonorReport } from './pages/reports/DonorReport'
+import { HqReport } from './pages/reports/HqReport'
+import { SentReports } from './pages/reports/SentReports'
+import { ReportSettings } from './pages/settings/ReportSettings'
 import { Calendar } from './pages/alerts/Calendar'
 import { Inbox } from './pages/alerts/Inbox'
 import { Channels } from './pages/settings/Channels'
@@ -58,6 +62,10 @@ const routes: [string, React.ReactNode][] = [
   ['/settings/approval-rules', <Rules />],
   ['/settings/notifications', <NotificationRules />],
   ['/settings/channels', <Channels />],
+  ['/settings/reports', <ReportSettings />],
+  ['/reports/hq', <HqReport />],
+  ['/reports/donor', <DonorReport />],
+  ['/reports/sent', <SentReports />],
   ['/alerts', <Inbox />],
   ['/alerts/calendar', <Calendar />],
 ]

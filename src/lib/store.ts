@@ -17,6 +17,9 @@ import {
   staff,
 } from '../data/finance'
 import type {
+  HqDraft,
+  ReportSettings,
+  SentReport,
   AppNotification,
   Channel,
   ChannelConfig,
@@ -69,6 +72,13 @@ interface State {
   users: User[]
   roles: Role[]
   sidebarCollapsed: boolean
+  reportSettings: ReportSettings
+  hqDrafts: HqDraft[]
+  sentReports: SentReport[]
+  setReportSettings: (r: ReportSettings) => void
+  saveHqDraft: (period: string, patch: Partial<HqDraft>) => void
+  recordSent: (r: Omit<SentReport, 'id' | 'at' | 'by'>) => void
+
   notifRules: NotifRule[]
   notifications: AppNotification[]
   deliveries: Delivery[]
@@ -158,11 +168,34 @@ interface State {
   setProjectControl: (projectId: string, mode: ControlMode, tolerancePct: number) => void
 }
 
+const defaultReportSettings: ReportSettings = {
+  hq: {
+    to: ['hq.reports@phf-kw.org'],
+    cc: ['director@kphfs.org'],
+    subject: { ar: 'التقرير الشهري لمكتب السودان — {month}', en: 'Sudan office monthly report — {month}' },
+    body: {
+      ar: 'السادة / {hq} المحترمين،\nالسلام عليكم ورحمة الله وبركاته،\n\nنرفق لكم التقرير الشهري لمكتب السودان عن شهر {month}، ويتضمن الموقف المالي وتقدم المشاريع والأنشطة الميدانية وأعداد المستفيدين.\n\nوتفضلوا بقبول فائق الاحترام،\n{sender}\n{org}',
+      en: 'Dear {hq},\n\nPlease find attached the Sudan office monthly report for {month}, covering the financial position, project progress, field activities and beneficiaries.\n\nKind regards,\n{sender}\n{org}',
+    },
+    requireApproval: true,
+    approverRole: 'executive_director',
+    autoSendDay: 10,
+    includeSections: { finance: true, projects: true, activities: true, compliance: true, supply: true, hr: true, challenges: true, plan: true },
+  },
+  donor: {
+    pa: { to: ['grants@donor-a.org'], cc: ['finance@kphfs.org'], subject: { ar: 'تقرير المشروع {project} — {period}', en: 'Project report {project} — {period}' }, body: { ar: 'السادة / {donor} المحترمين،\n\nنرفق تقرير المشروع {project} عن الفترة {period}.\n\nمع التحية،\n{sender}\n{org}', en: 'Dear {donor},\n\nPlease find attached the {project} report for {period}.\n\nKind regards,\n{sender}\n{org}' } },
+    pb: { to: ['programs@donor-b.org'], cc: ['finance@kphfs.org'], subject: { ar: 'تقرير المشروع {project} — {period}', en: 'Project report {project} — {period}' }, body: { ar: 'السادة / {donor} المحترمين،\n\nنرفق تقرير المشروع {project} عن الفترة {period}.\n\nمع التحية،\n{sender}\n{org}', en: 'Dear {donor},\n\nPlease find attached the {project} report for {period}.\n\nKind regards,\n{sender}\n{org}' } },
+  },
+}
+
 const fresh = () => {
   const s = buildSeed()
   const lineMap = defaultLineMap()
   const f = buildFinance(s.expenses, lineMap)
   return {
+    reportSettings: structuredClone(defaultReportSettings),
+    hqDrafts: [] as HqDraft[],
+    sentReports: [] as SentReport[],
     notifRules: structuredClone(defaultRules),
     notifications: [] as AppNotification[],
     deliveries: [] as Delivery[],
@@ -285,6 +318,33 @@ export const useStore = create<State>()(
   sidebarCollapsed: false,
   offlineSim: false,
   ...fresh(),
+
+  setReportSettings: (r) => {
+    set({ reportSettings: r })
+    get().toast({ ar: 'حُفظت إعدادات إرسال التقارير', en: 'Report delivery settings saved' })
+  },
+  saveHqDraft: (period, patch) =>
+    set((s) => {
+      const cur = s.hqDrafts.find((d) => d.period === period) ?? { period, status: 'draft' as const }
+      const next = { ...cur, ...patch }
+      return { hqDrafts: [...s.hqDrafts.filter((d) => d.period !== period), next] }
+    }),
+  recordSent: (r) => {
+    const s = get()
+    const rec: SentReport = { ...r, id: `rp-${Date.now().toString(36)}`, at: new Date().toISOString(), by: s.userId }
+    const deliveries: Delivery[] = [...r.to, ...r.cc].map((to, i) => ({
+      id: `dl-rp-${Date.now()}-${i}`,
+      at: rec.at,
+      channel: 'email',
+      to,
+      subject: r.subject,
+      status: s.channels.email.enabled ? 'sent' : 'skipped',
+      reason: s.channels.email.enabled ? undefined : { ar: 'البريد غير مفعّل في الإعدادات', en: 'Email is turned off in settings' },
+    }))
+    set({ sentReports: [rec, ...s.sentReports], deliveries: [...deliveries, ...s.deliveries].slice(0, 400) })
+    if (r.kind === 'hq') get().saveHqDraft(r.period, { status: 'sent' })
+    get().toast({ ar: `أُرسل «${r.title.ar}» إلى ${r.to.join('، ')}`, en: `“${r.title.en}” sent to ${r.to.join(', ')}` })
+  },
 
   runNotifications: () => {
     const s = get()
@@ -740,7 +800,7 @@ export const useStore = create<State>()(
     set((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, controlMode: mode, tolerancePct } : p)) })),
   }),
   {
-    name: 'phf-erp-demo-v5',
+    name: 'phf-erp-demo-v7',
     storage: createJSONStorage(() => safeStorage),
     partialize: (s) => {
       const { toasts: _t, ...rest } = s

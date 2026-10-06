@@ -259,7 +259,7 @@ export function buildFinance(expenses: Expense[], lineMap: Record<string, string
     [-150, 60_000, 'pa', '4101', { ar: 'مانح (أ)', en: 'Donor A' }, { ar: 'الدفعة الأولى — مشروع (أ)', en: 'First tranche — Project A' }],
     [-85, 60_000, 'pb', '4101', { ar: 'مانح (ب)', en: 'Donor B' }, { ar: 'منحة مشروع (ب) كاملة', en: 'Project B grant, full amount' }],
     [-60, 40_000, 'pa', '4101', { ar: 'مانح (أ)', en: 'Donor A' }, { ar: 'الدفعة الثانية — مشروع (أ)', en: 'Second tranche — Project A' }],
-    [-40, 52_000, undefined, '4102', { ar: 'الصندوق — الكويت', en: 'PHF — Kuwait' }, { ar: 'تبرعات عامة — الربع الثالث', en: 'General donations — Q3' }],
+    [-24, 52_000, undefined, '4102', { ar: 'الصندوق — الكويت', en: 'PHF — Kuwait' }, { ar: 'تبرعات عامة — الربع الثالث', en: 'General donations — Q3' }],
   ]
   for (const [d, amt, projectId, acc, party, memo] of receipts) {
     const date = daysFromNow(d)
