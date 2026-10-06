@@ -18,6 +18,11 @@ import {
   staff,
 } from '../data/finance'
 import type {
+  Beneficiary,
+  Employee,
+  LeaveRequest,
+  PayrollRun,
+  Service,
   Item,
   Shipment,
   ShipmentLine,
@@ -64,6 +69,7 @@ import type {
 } from '../data/types'
 import { checkCeiling, findLine, routeApproval } from './budget'
 import { revaluation } from './ledger'
+import { buildBeneficiaries, employees as seedEmployees, leaves as seedLeaves } from '../data/people'
 import { buildSupply, categoryAccount, INKIND_REVENUE, INVENTORY, items as seedItems } from '../data/supply'
 import { defaultChannels, defaultRules, runEngine, testChannel } from './notify'
 
@@ -81,6 +87,17 @@ interface State {
   users: User[]
   roles: Role[]
   sidebarCollapsed: boolean
+  employees: Employee[]
+  leaves: LeaveRequest[]
+  payrolls: PayrollRun[]
+  beneficiaries: Beneficiary[]
+  saveEmployee: (e: Employee) => void
+  requestLeave: (l: Omit<LeaveRequest, 'id' | 'status' | 'createdAt'>) => void
+  decideLeave: (id: string, approve: boolean) => void
+  postPayroll: (period: string) => void
+  saveBeneficiary: (b: Beneficiary) => void
+  addService: (beneficiaryId: string, sv: Omit<Service, 'id'>) => void
+
   items: Item[]
   stock: StockLevel[]
   stockMoves: StockMove[]
@@ -222,6 +239,10 @@ const fresh = () => {
   journal.forEach((e, i) => (e.no = `JE-${String(i + 1).padStart(4, '0')}`))
   f.journal = journal
   return {
+    employees: structuredClone(seedEmployees),
+    leaves: structuredClone(seedLeaves),
+    payrolls: [] as PayrollRun[],
+    beneficiaries: buildBeneficiaries(seedActivities),
     items: structuredClone(seedItems),
     stock: sup.stock,
     stockMoves: sup.moves,
@@ -623,6 +644,89 @@ export const useStore = create<State>()(
 
 
 
+
+  // ---- people ---------------------------------------------------------------
+  saveEmployee: (e) => {
+    const s = get()
+    const exists = s.employees.some((x) => x.id === e.id)
+    set({ employees: exists ? s.employees.map((x) => (x.id === e.id ? e : x)) : [...s.employees, e] })
+    get().toast(exists ? { ar: `حُفظ ملف ${e.name.ar}`, en: `${e.name.en} saved` } : { ar: `أُضيف الموظف ${e.name.ar} (${e.no})`, en: `${e.name.en} added (${e.no})` })
+  },
+  requestLeave: (l) => {
+    set((s) => ({ leaves: [{ ...l, id: `lv-${Date.now()}`, status: 'pending', createdAt: new Date().toISOString() }, ...s.leaves] }))
+    get().toast({ ar: 'أُرسل طلب الإجازة إلى الموارد البشرية', en: 'Leave request sent to HR' })
+  },
+  decideLeave: (id, approve) => {
+    const s = get()
+    const l = s.leaves.find((x) => x.id === id)
+    if (!l) return
+    const now = Date.now()
+    set({
+      leaves: s.leaves.map((x) => (x.id === id ? { ...x, status: approve ? 'approved' : 'rejected', decidedBy: s.userId } : x)),
+      employees: s.employees.map((e) =>
+        e.id === l.employeeId && approve
+          ? { ...e, leaveBalance: l.type === 'annual' ? Math.max(0, e.leaveBalance - l.days) : e.leaveBalance, status: +new Date(l.from) <= now && +new Date(l.to) >= now ? 'on_leave' : e.status }
+          : e,
+      ),
+    })
+    get().toast(approve ? { ar: 'اعتُمدت الإجازة وخُصمت من الرصيد', en: 'Leave approved and deducted from the balance' } : { ar: 'رُفض طلب الإجازة', en: 'Leave request rejected' }, approve ? 'ok' : 'warn')
+  },
+  postPayroll: (period) => {
+    const s = get()
+    if (s.payrolls.some((p) => p.period === period)) return
+    const rate = s.rates.at(-1)!.rate
+    const paid = s.employees.filter((e) => e.status !== 'ended' && e.salarySDG > 0)
+    const now = new Date().toISOString()
+    const ded = 0.08 // employee social insurance withheld
+    const lines: JournalLine[] = []
+    const expenses: Expense[] = []
+    let gross = 0
+    for (const e of paid) {
+      const g = e.salarySDG / rate
+      gross += g
+      let left = 1
+      for (const a of e.allocations) {
+        const part = Math.round(g * (a.pct / 100) * 100) / 100
+        left -= a.pct / 100
+        lines.push({ account: '5201', debit: part, credit: 0, officeId: e.officeId, projectId: a.projectId, lineId: a.lineId })
+        expenses.push({ id: `ex-pay-${period}-${e.id}-${a.lineId}`, lineId: a.lineId, projectId: a.projectId, officeId: e.officeId, amountUSD: part, date: now, hasTechReport: true })
+      }
+      if (left > 0.001) lines.push({ account: '5201', debit: Math.round(g * left * 100) / 100, credit: 0, officeId: e.officeId })
+    }
+    const total = lines.reduce((t, l) => t + l.debit, 0)
+    const withheld = Math.round(total * ded * 100) / 100
+    const net = Math.round((total - withheld) * 100) / 100
+    lines.push({ account: BANK_SDG, debit: 0, credit: net, sdg: -Math.round(net * rate), officeId: 'khr' })
+    lines.push({ account: '2104', debit: 0, credit: withheld })
+    const je: JournalEntry = {
+      id: `je-n${s.fseq.je}`,
+      no: `JE-${String(s.fseq.je).padStart(4, '0')}`,
+      date: now,
+      memo: { ar: `رواتب شهر ${period}`, en: `Payroll ${period}` },
+      source: 'payment',
+      ref: `PAY-${period}`,
+      lines,
+    }
+    set({
+      journal: [...s.journal, je],
+      expenses: [...expenses, ...s.expenses],
+      payrolls: [...s.payrolls, { period, postedAt: now, postedBy: s.userId, rate, totalSDG: paid.reduce((t, e) => t + e.salarySDG, 0), journalId: je.id }],
+      fseq: { ...s.fseq, je: s.fseq.je + 1 },
+    })
+    void gross
+    get().toast({ ar: `رُحّلت رواتب ${period} — القيد ${je.no}، وحُمّلت حصص المشاريع على بنودها`, en: `Payroll ${period} posted — entry ${je.no}; project shares charged to their lines` })
+  },
+  saveBeneficiary: (b) => {
+    const s = get()
+    const exists = s.beneficiaries.some((x) => x.id === b.id)
+    set({ beneficiaries: exists ? s.beneficiaries.map((x) => (x.id === b.id ? b : x)) : [b, ...s.beneficiaries] })
+    get().toast(exists ? { ar: 'حُفظت البيانات', en: 'Saved' } : { ar: `سُجّل المستفيد ${b.no}`, en: `Beneficiary ${b.no} registered` })
+  },
+  addService: (id, sv) => {
+    set((s) => ({ beneficiaries: s.beneficiaries.map((b) => (b.id === id ? { ...b, services: [...b.services, { ...sv, id: `sv-${Date.now()}` }] } : b)) }))
+    get().toast({ ar: 'سُجّلت الخدمة', en: 'Service recorded' })
+  },
+
   // ---- supply chain & logistics -------------------------------------------
   qtyOf: (itemId, officeId) => get().stock.find((x) => x.itemId === itemId && x.officeId === officeId)?.qty ?? 0,
   lowStockCount: () => {
@@ -997,7 +1101,7 @@ export const useStore = create<State>()(
     set((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, controlMode: mode, tolerancePct } : p)) })),
   }),
   {
-    name: 'phf-erp-demo-v8',
+    name: 'phf-erp-demo-v9',
     storage: createJSONStorage(() => safeStorage),
     partialize: (s) => {
       const { toasts: _t, ...rest } = s

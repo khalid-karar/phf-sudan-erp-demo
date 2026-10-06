@@ -540,3 +540,80 @@ export interface Vehicle {
   fuel: FuelLog[]
   nextServiceKm: number
 }
+
+// --- Human resources & beneficiaries -------------------------------------------
+
+export type Department = 'medical' | 'field' | 'finance' | 'admin' | 'supply' | 'logistics'
+export type Contract = 'permanent' | 'fixed' | 'daily' | 'volunteer'
+
+export interface Allocation {
+  projectId: string
+  lineId: string
+  pct: number
+}
+
+export interface Employee {
+  id: string
+  no: string
+  name: Bi
+  officeId: string
+  position: Bi
+  department: Department
+  contract: Contract
+  startDate: string
+  endDate?: string
+  salarySDG: number // monthly gross
+  phone?: string
+  status: 'active' | 'on_leave' | 'ended'
+  userId?: string
+  allocations: Allocation[] // share of salary charged to project lines
+  leaveBalance: number // annual leave days left
+}
+
+export interface LeaveRequest {
+  id: string
+  employeeId: string
+  type: 'annual' | 'sick' | 'emergency' | 'unpaid'
+  from: string
+  to: string
+  days: number
+  note?: string
+  status: 'pending' | 'approved' | 'rejected'
+  decidedBy?: string
+  createdAt: string
+}
+
+export interface PayrollRun {
+  period: string // YYYY-MM
+  postedAt: string
+  postedBy: string
+  rate: number
+  totalSDG: number
+  journalId: string
+}
+
+export type ServiceType = 'consultation' | 'surgery' | 'medicines' | 'nutrition' | 'vaccination' | 'referral' | 'maternal'
+
+export interface Service {
+  id: string
+  date: string
+  type: ServiceType
+  activityId?: string
+  officeId: string
+  note?: string
+}
+
+export interface Beneficiary {
+  id: string
+  no: string
+  name: Bi
+  gender: 'm' | 'f'
+  birthYear: number
+  officeId: string
+  locality: string
+  displaced: boolean
+  phone?: string
+  registeredAt: string
+  registeredBy?: string
+  services: Service[]
+}
