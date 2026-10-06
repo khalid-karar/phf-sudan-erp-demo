@@ -23,6 +23,12 @@ export const daysFromNow = (n: number) => new Date(Date.now() + n * DAY).toISOSt
 // Demo exchange rate (SDG per USD). The real system keeps a dated rate log.
 export const SDG_RATE = 2450
 
+/** A given day of next month (keeps monthly deadlines realistic whenever the demo is opened). */
+export const nextMonthDay = (day: number) => {
+  const n = new Date()
+  return new Date(n.getFullYear(), n.getMonth() + (n.getDate() >= day ? 1 : 0), day, 12).toISOString()
+}
+
 export const offices: Office[] = [
   { id: 'khr', name: { ar: 'الرئاسة — الخرطوم', en: 'HQ — Khartoum' }, state: { ar: 'الخرطوم', en: 'Khartoum' }, lat: 15.5, lon: 32.56, isHQ: true, type: 'hq', active: true, managerId: 'u-ed', phone: '+249 183 000 100' },
   { id: 'pts', name: { ar: 'بورتسودان', en: 'Port Sudan' }, state: { ar: 'البحر الأحمر', en: 'Red Sea' }, lat: 19.62, lon: 37.22, type: 'office', active: true },
@@ -587,10 +593,11 @@ export function buildSeed() {
     },
   ]
   const deadlines: Deadline[] = [
-    { id: 'd1', title: { ar: 'التقرير الربعي للمانح — مشروع (أ)', en: 'Quarterly donor report — Project A' }, projectId: 'pa', due: daysFromNow(7), notifyDaysBefore: 10, owner: 'finance_manager' },
+    { id: 'd1', title: { ar: 'التقرير الربعي للمانح — مشروع (أ)', en: 'Quarterly donor report — Project A' }, projectId: 'pa', due: daysFromNow(7), notifyDaysBefore: 10, owner: 'finance_manager', recurrence: 'quarterly' },
     { id: 'd2', title: { ar: 'تقرير التغذية الشهري — مشروع (ب)', en: 'Monthly nutrition report — Project B' }, projectId: 'pb', due: daysFromNow(3), notifyDaysBefore: 5, owner: 'supervisor' },
     { id: 'd3', title: { ar: 'التقرير الفني الشهري — مكتب الفاشر', en: 'Monthly technical report — El Fasher office' }, due: daysFromNow(-4), notifyDaysBefore: 5, owner: 'field_officer' },
-    { id: 'd4', title: { ar: 'الإقفال المالي الشهري — جميع المكاتب', en: 'Monthly financial close — all offices' }, due: daysFromNow(24), notifyDaysBefore: 7, owner: 'finance_manager' },
+    { id: 'd4', title: { ar: 'الإقفال المالي الشهري — جميع المكاتب', en: 'Monthly financial close — all offices' }, due: nextMonthDay(5), notifyDaysBefore: 4, owner: 'finance_manager', recurrence: 'monthly' },
+    { id: 'd6', title: { ar: 'التقرير الشهري إلى المقر الرئيسي — الكويت', en: 'Monthly report to headquarters — Kuwait' }, due: nextMonthDay(10), notifyDaysBefore: 5, owner: 'finance_manager', recurrence: 'monthly' },
     { id: 'd5', title: { ar: 'تسليم ملف التدقيق السنوي', en: 'Annual audit file submission' }, due: daysFromNow(54), notifyDaysBefore: 30, owner: 'finance_manager' },
   ]
   return {

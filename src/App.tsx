@@ -25,6 +25,10 @@ import { Organization } from './pages/settings/Organization'
 import { Roles } from './pages/settings/Roles'
 import { Users } from './pages/settings/Users'
 import { Upcoming } from './pages/Upcoming'
+import { Calendar } from './pages/alerts/Calendar'
+import { Inbox } from './pages/alerts/Inbox'
+import { Channels } from './pages/settings/Channels'
+import { NotificationRules } from './pages/settings/NotificationRules'
 
 const routes: [string, React.ReactNode][] = [
   ['/', <Dashboard />],
@@ -52,6 +56,10 @@ const routes: [string, React.ReactNode][] = [
   ['/settings/users', <Users />],
   ['/settings/roles', <Roles />],
   ['/settings/approval-rules', <Rules />],
+  ['/settings/notifications', <NotificationRules />],
+  ['/settings/channels', <Channels />],
+  ['/alerts', <Inbox />],
+  ['/alerts/calendar', <Calendar />],
 ]
 
 export default function App() {

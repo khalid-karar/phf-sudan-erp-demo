@@ -169,6 +169,8 @@ export interface Deadline {
   due: string
   notifyDaysBefore: number
   owner: RoleKey
+  recurrence?: 'none' | 'monthly' | 'quarterly' | 'yearly'
+  done?: boolean
 }
 
 export interface ActivityLog {
@@ -318,4 +320,101 @@ export interface MonthClose {
   cashCounted: boolean
   closedAt?: string
   closedBy?: string
+}
+
+// --- Notifications -----------------------------------------------------------
+
+export type NotifEvent =
+  | 'approval_waiting'
+  | 'request_stale'
+  | 'request_decided'
+  | 'deadline_near'
+  | 'deadline_overdue'
+  | 'advance_overdue'
+  | 'report_overdue'
+  | 'line_threshold'
+  | 'spend_no_report'
+  | 'month_close'
+  | 'low_stock'
+
+export type Channel = 'email' | 'whatsapp' | 'sms'
+
+export interface NotifRule {
+  id: string
+  event: NotifEvent
+  name: Bi
+  threshold?: number // hours, days or percent depending on the event
+  recipients: { concerned: boolean; roles: string[]; users: string[] } // concerned = the person the event is about (approver, requester, owner…)
+  channels: { inapp: boolean } & Record<Channel, boolean>
+  enabled: boolean
+}
+
+export interface AppNotification {
+  id: string
+  key: string // de-duplication key
+  ruleId: string
+  event: NotifEvent
+  severity: 'info' | 'warn' | 'critical'
+  title: Bi
+  body: Bi
+  link: string
+  createdAt: string
+  userIds: string[]
+  readBy: string[]
+}
+
+export interface Delivery {
+  id: string
+  at: string
+  notificationId?: string
+  channel: Channel
+  to: string
+  toName?: Bi
+  subject: string
+  status: 'sent' | 'failed' | 'skipped'
+  reason?: Bi
+}
+
+export interface ChannelTest {
+  at: string
+  ok: boolean
+  message: Bi
+}
+
+export interface ChannelConfig {
+  email: {
+    enabled: boolean
+    provider: 'microsoft365' | 'google' | 'smtp' | 'sendgrid'
+    host: string
+    port: number
+    security: 'starttls' | 'ssl' | 'none'
+    username: string
+    password: string
+    fromName: string
+    fromAddress: string
+    replyTo: string
+    lastTest?: ChannelTest
+  }
+  whatsapp: {
+    enabled: boolean
+    mode: 'cloud_api' | 'click_to_chat'
+    phoneNumberId: string
+    businessAccountId: string
+    accessToken: string
+    senderNumber: string
+    templateName: string
+    templateLanguage: 'ar' | 'en'
+    lastTest?: ChannelTest
+  }
+  sms: {
+    enabled: boolean
+    provider: 'twilio' | 'http'
+    accountSid: string
+    authToken: string
+    fromNumber: string
+    apiUrl: string
+    apiKey: string
+    senderId: string
+    lastTest?: ChannelTest
+  }
 }

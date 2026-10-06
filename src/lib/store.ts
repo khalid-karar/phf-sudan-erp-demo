@@ -17,6 +17,12 @@ import {
   staff,
 } from '../data/finance'
 import type {
+  AppNotification,
+  Channel,
+  ChannelConfig,
+  Deadline,
+  Delivery,
+  NotifRule,
   FieldActivity,
   FieldReport,
   OutboxItem,
@@ -47,6 +53,7 @@ import type {
 } from '../data/types'
 import { checkCeiling, findLine, routeApproval } from './budget'
 import { revaluation } from './ledger'
+import { defaultChannels, defaultRules, runEngine, testChannel } from './notify'
 
 export interface Toast {
   id: number
@@ -62,6 +69,22 @@ interface State {
   users: User[]
   roles: Role[]
   sidebarCollapsed: boolean
+  notifRules: NotifRule[]
+  notifications: AppNotification[]
+  deliveries: Delivery[]
+  channels: ChannelConfig
+
+  runNotifications: () => void
+  saveNotifRule: (r: NotifRule) => void
+  deleteNotifRule: (id: string) => void
+  markRead: (id: string) => void
+  markAllRead: () => void
+  unreadCount: (userId: string) => number
+  setChannels: (patch: Partial<ChannelConfig>) => void
+  runChannelTest: (ch: Channel, to: string, draft?: ChannelConfig) => ChannelConfig[Channel]['lastTest']
+  saveDeadline: (d: Deadline) => void
+  deleteDeadline: (id: string) => void
+
   activities: FieldActivity[]
   outbox: OutboxItem[]
   offlineSim: boolean
@@ -140,6 +163,10 @@ const fresh = () => {
   const lineMap = defaultLineMap()
   const f = buildFinance(s.expenses, lineMap)
   return {
+    notifRules: structuredClone(defaultRules),
+    notifications: [] as AppNotification[],
+    deliveries: [] as Delivery[],
+    channels: structuredClone(defaultChannels),
     activities: structuredClone(seedActivities),
     outbox: [] as OutboxItem[],
     org: structuredClone(orgDefaults),
@@ -258,6 +285,47 @@ export const useStore = create<State>()(
   sidebarCollapsed: false,
   offlineSim: false,
   ...fresh(),
+
+  runNotifications: () => {
+    const s = get()
+    const { notifications, deliveries } = runEngine(s)
+    if (!notifications.length && !deliveries.length) return
+    set({ notifications: [...notifications, ...s.notifications].slice(0, 400), deliveries: [...deliveries, ...s.deliveries].slice(0, 400) })
+  },
+  saveNotifRule: (r) => {
+    const s = get()
+    const exists = s.notifRules.some((x) => x.id === r.id)
+    set({ notifRules: exists ? s.notifRules.map((x) => (x.id === r.id ? r : x)) : [...s.notifRules, r] })
+    get().toast({ ar: 'حُفظت قاعدة التنبيه', en: 'Notification rule saved' })
+  },
+  deleteNotifRule: (id) => set((s) => ({ notifRules: s.notifRules.filter((r) => r.id !== id) })),
+  markRead: (id) => set((s) => ({ notifications: s.notifications.map((n) => (n.id === id && !n.readBy.includes(s.userId) ? { ...n, readBy: [...n.readBy, s.userId] } : n)) })),
+  markAllRead: () => set((s) => ({ notifications: s.notifications.map((n) => (n.userIds.includes(s.userId) && !n.readBy.includes(s.userId) ? { ...n, readBy: [...n.readBy, s.userId] } : n)) })),
+  unreadCount: (userId) => get().notifications.filter((n) => n.userIds.includes(userId) && !n.readBy.includes(userId)).length,
+  setChannels: (patch) => {
+    set((s) => ({ channels: { ...s.channels, ...patch } }))
+  },
+  runChannelTest: (ch, to, draft) => {
+    const s = get()
+    const r = testChannel(draft ?? s.channels, ch, to)
+    const test = { at: new Date().toISOString(), ok: r.ok, message: r.message }
+    set({
+      channels: { ...s.channels, [ch]: { ...s.channels[ch], lastTest: test } },
+      deliveries: [
+        { id: `dl-test-${Date.now()}`, at: test.at, channel: ch, to, subject: 'رسالة تجريبية من نظام إدارة الموارد', status: (r.ok ? 'sent' : 'failed') as Delivery['status'], reason: r.ok ? undefined : r.message },
+        ...s.deliveries,
+      ].slice(0, 400),
+    })
+    get().toast(r.message, r.ok ? 'ok' : 'bad')
+    return test
+  },
+  saveDeadline: (d) => {
+    const s = get()
+    const exists = s.deadlines.some((x) => x.id === d.id)
+    set({ deadlines: exists ? s.deadlines.map((x) => (x.id === d.id ? d : x)) : [...s.deadlines, d] })
+    get().toast(exists ? { ar: 'حُفظ الموعد', en: 'Deadline saved' } : { ar: 'أُضيف الموعد وسيُنبَّه المسؤول قبله', en: 'Deadline added; its owner will be reminded beforehand' })
+  },
+  deleteDeadline: (id) => set((s) => ({ deadlines: s.deadlines.filter((d) => d.id !== id) })),
 
   saveActivity: (a) => {
     const s = get()
@@ -672,7 +740,7 @@ export const useStore = create<State>()(
     set((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, controlMode: mode, tolerancePct } : p)) })),
   }),
   {
-    name: 'phf-erp-demo-v4',
+    name: 'phf-erp-demo-v5',
     storage: createJSONStorage(() => safeStorage),
     partialize: (s) => {
       const { toasts: _t, ...rest } = s
@@ -682,6 +750,20 @@ export const useStore = create<State>()(
   },
   ),
 )
+
+// Re-evaluate notification rules shortly after data changes (debounced).
+let notifTimer: ReturnType<typeof setTimeout> | undefined
+let lastSig = ''
+useStore.subscribe((st) => {
+  const sig = [st.requests, st.reallocations, st.deadlines, st.advances, st.activities, st.expenses, st.closes, st.notifRules, st.projects, (st as unknown as { stock?: unknown }).stock]
+    .map((x) => (Array.isArray(x) ? x.length + ':' + JSON.stringify(x).length : String(x && JSON.stringify(x).length)))
+    .join('|')
+  if (sig === lastSig) return
+  lastSig = sig
+  clearTimeout(notifTimer)
+  notifTimer = setTimeout(() => useStore.getState().runNotifications(), 250)
+})
+setTimeout(() => useStore.getState().runNotifications(), 50)
 
 // Role names are read outside React in a few places; keep a live copy.
 const syncRoles = () => ((globalThis as { __phfRoles?: Role[] }).__phfRoles = useStore.getState().roles)
