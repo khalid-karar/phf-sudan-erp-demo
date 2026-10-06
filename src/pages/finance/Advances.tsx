@@ -17,6 +17,7 @@ export function Advances() {
   const ar = lang === 'ar'
   const s = useStore()
   const user = useUser()
+  const { can, scopeOffice } = usePerm()
   const [settling, setSettling] = useState<Advance | null>(null)
   const [filter, setFilter] = useState<'open' | 'settled' | 'all'>('open')
   const open = s.advances.filter((a) => a.status === 'open')
@@ -24,7 +25,6 @@ export function Advances() {
   const outstanding = open.reduce((t, a) => t + a.amountUSD, 0)
   const ready = open.filter((a) => activityFor(a.activityCode)?.report)
   const list = s.advances.filter((a) => (!scopeOffice || a.officeId === scopeOffice) && (filter === 'all' || a.status === filter)).sort((a, b) => +new Date(a.dueAt) - +new Date(b.dueAt))
-  const { can, scopeOffice } = usePerm()
   void user
   const canSettle = can('finance', 'edit')
 

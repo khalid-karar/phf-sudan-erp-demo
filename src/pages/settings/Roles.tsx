@@ -97,7 +97,7 @@ export function Roles() {
           </ul>
         </Panel>
 
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <Panel className="p-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={ar ? 'اسم الدور بالعربية' : 'Role name (Arabic)'}>

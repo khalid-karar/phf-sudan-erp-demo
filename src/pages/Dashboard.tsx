@@ -97,7 +97,7 @@ export function Dashboard() {
         <div className="text-[13.5px] text-muted">{date(new Date().toISOString(), lang)}</div>
         <h1 className="mt-1 flex items-center gap-2.5 text-[28px] font-bold">
           <span>
-            {greet}{ar ? '، ' : ', '}{user.name[lang].split(' ')[0] === 'د.' ? user.name[lang] : user.name[lang].split(' ')[0]}
+            {greet}{ar ? '، ' : ', '}{/^(د\.|م\.|Dr\.|Eng\.)$/.test(user.name[lang].split(' ')[0]) ? user.name[lang].split(' ').slice(0, 2).join(' ') : user.name[lang].split(' ')[0]}
           </span>
           <PageHelpButton />
         </h1>
