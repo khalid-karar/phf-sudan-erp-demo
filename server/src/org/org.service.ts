@@ -29,7 +29,7 @@ const publicUser = {
 const lockAdminGuard = (tx: DbOrTx) => tx.execute(sql`select pg_advisory_xact_lock(hashtext('admin-guard'))`)
 
 /** A readable temporary password, e.g. "Phf-7k2m-9qxa". */
-const tempPassword = () => `Phf-${randomBytes(3).toString('hex').slice(0, 4)}-${randomBytes(3).toString('hex').slice(0, 4)}1`
+const tempPassword = () => `Phf-${randomBytes(4).toString('hex')}-${randomBytes(4).toString('hex')}1`
 
 @Injectable()
 export class OrgService {

@@ -36,7 +36,7 @@ The server needs Docker, and a domain name (e.g. `erp.phfsudan.org`) whose DNS p
 
 ```bash
 git clone https://github.com/khalid-karar/phf-sudan-erp-demo.git && cd phf-sudan-erp-demo/server
-cp .env.example .env              # set DB_PASSWORD, JWT_SECRET, APP_DOMAIN, BOOTSTRAP_ADMIN_EMAIL
+cp .env.example .env              # set DB_PASSWORD, JWT_SECRET, SECRETS_KEY, APP_DOMAIN, BOOTSTRAP_ADMIN_EMAIL (and BOOTSTRAP_SDG_RATE)
 docker compose up -d --build      # web app + API + PostgreSQL + nightly backups + HTTPS (Caddy)
 docker compose exec api node dist/db/bootstrap.js
 ```

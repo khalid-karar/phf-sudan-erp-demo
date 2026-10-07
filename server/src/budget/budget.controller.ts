@@ -28,7 +28,6 @@ export class BudgetController {
     return this.budget.expenses(u)
   }
 
-  @Perm('projects', 'view')
   /** Declared before `:id` routes so "expenses" is not read as a project id. */
   @Perm('activities', 'edit')
   @Post('expenses/:lineId/link')
@@ -36,6 +35,7 @@ export class BudgetController {
     return this.budget.linkExpense(u, lineId, b.activityId)
   }
 
+  @Perm('projects', 'view')
   @Get(':id')
   tree(@Param('id') id: string) {
     return this.budget.tree(id)

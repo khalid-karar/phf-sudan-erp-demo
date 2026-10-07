@@ -58,7 +58,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (pg?.code === '23514') return res.status(422).json({ code: 'CHECK_FAILED', message: { ar: 'القيم لا تحقق شروط النظام', en: 'Values break a system rule' }, details: pg.constraint })
     if (pg?.code === '40001' || pg?.code === '40P01') return res.status(409).json({ code: 'RETRY', message: { ar: 'تعارض مع عملية أخرى — حاول مرة أخرى', en: 'Conflicted with another operation — please retry' } })
 
-    this.log.error(e instanceof Error ? (e.stack ?? e.message) : String(e))
+    // Database errors can carry the query's parameters (password hashes, tokens): log everything but those.
+    const text = e instanceof Error ? (e.stack ?? e.message) : String(e)
+    this.log.error(text.replace(/\n?params:[^\n]*/g, ' params: [hidden]'))
     return res.status(500).json({ code: 'INTERNAL', message: { ar: 'خطأ غير متوقع', en: 'Unexpected error' } })
   }
 }

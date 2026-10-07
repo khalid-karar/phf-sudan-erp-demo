@@ -41,11 +41,11 @@ export class AuthService {
       throw new AppError(423, 'ACCOUNT_LOCKED', { ar: 'الحساب مقفل مؤقتاً بسبب محاولات خاطئة متكررة', en: 'Account temporarily locked after repeated failed attempts' }, { until: u.lockedUntil })
     }
     if (!(await verifyPassword(u.passwordHash, password))) {
-      const failed = u.failedLogins + 1
-      await this.db
-        .update(users)
-        .set({ failedLogins: failed >= MAX_FAILED ? 0 : failed, lockedUntil: failed >= MAX_FAILED ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null })
-        .where(eq(users.id, u.id))
+      // Counted in the database so several wrong guesses at once cannot all read the same count.
+      await this.db.execute(sql`update users set
+        failed_logins = case when failed_logins + 1 >= ${MAX_FAILED} then 0 else failed_logins + 1 end,
+        locked_until = case when failed_logins + 1 >= ${MAX_FAILED} then now() + (${LOCK_MINUTES} * interval '1 minute') else null end
+        where id = ${u.id}`)
       await audit(this.db, null, 'auth.login_failed', 'user', u.id, { ip: meta.ip })
       throw badLogin()
     }

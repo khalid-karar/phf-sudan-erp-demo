@@ -29,7 +29,7 @@ services:
       CORS_ORIGINS: https://${APP_DOMAIN}
       TRUST_PROXY: 'true'
       APP_URL: https://${APP_DOMAIN}
-      SECRETS_KEY: ${SECRETS_KEY:-}
+      SECRETS_KEY: ${SECRETS_KEY:?set SECRETS_KEY in .env (openssl rand -hex 32) and keep it with your backups}
       NOTIFY_INTERVAL_SECONDS: ${NOTIFY_INTERVAL_SECONDS:-300}
       PORT: 3000
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
@@ -43,7 +43,9 @@ services:
   backup:
     image: postgres:16
     restart: unless-stopped
-    depends_on: [db]
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       PGPASSWORD: ${DB_PASSWORD}
     volumes:
@@ -51,10 +53,13 @@ services:
       - uploads:/data/uploads:ro
     entrypoint: >
       sh -c 'while true; do
-        pg_dump -h db -U phf -d phf_erp -Fc -f /backups/phf_erp_$$(date +%Y-%m-%d).dump &&
-        find /backups -name "*.dump" -mtime +30 -delete;
-        mkdir -p /backups/uploads && cp -an /data/uploads/. /backups/uploads/;
-        sleep 86400; done'
+        if pg_dump -h db -U phf -d phf_erp -Fc -f /backups/phf_erp_$$(date +%Y-%m-%d).dump; then
+          find /backups -name "*.dump" -mtime +30 -delete;
+          mkdir -p /backups/uploads && cp -an /data/uploads/. /backups/uploads/;
+          sleep 86400;
+        else
+          echo "backup failed, trying again in 10 minutes"; sleep 600;
+        fi; done'
 
   # The web app (built in live mode against this API) and HTTPS with automatic certificates, on one domain.
   # Point the domain's DNS at this server first.

@@ -13,7 +13,7 @@ import defaults from './defaults.json'
 import * as t from './schema'
 import { DEFAULT_RULES } from '../notifications/events'
 
-export async function bootstrap(db: DbOrTx, o: { adminEmail: string; adminNameAr: string; adminNameEn: string; hqId: string }) {
+export async function bootstrap(db: DbOrTx, o: { adminEmail: string; adminNameAr: string; adminNameEn: string; hqId: string; sdgRate?: string }) {
   const [{ n }] = (await db.execute<{ n: number }>(sql`select count(*)::int as n from roles`)).rows
   if (n > 0) return { skipped: true as const }
 
@@ -33,7 +33,10 @@ export async function bootstrap(db: DbOrTx, o: { adminEmail: string; adminNameAr
   await db.insert(t.approvalRules).values(defaults.rules as (typeof t.approvalRules.$inferInsert)[])
   await db.insert(t.notifRules).values(DEFAULT_RULES)
 
-  const temporaryPassword = `Phf-${randomBytes(4).toString('hex')}9`
+  // Payments need a rate; without a starting one the first payment is refused until Finance adds it.
+  if (o.sdgRate) await db.insert(t.exchangeRates).values({ date: new Date().toISOString().slice(0, 10), rate: o.sdgRate, source: 'initial' })
+
+  const temporaryPassword = `Phf-${randomBytes(6).toString('hex')}9`
   await db.insert(t.users).values({
     email: o.adminEmail.toLowerCase(),
     nameAr: o.adminNameAr,
@@ -58,11 +61,12 @@ if (require.main === module) {
         adminNameAr: process.env.BOOTSTRAP_ADMIN_NAME_AR ?? 'مدير النظام',
         adminNameEn: process.env.BOOTSTRAP_ADMIN_NAME_EN ?? 'System administrator',
         hqId: process.env.BOOTSTRAP_HQ_ID ?? 'khr',
+        sdgRate: process.env.BOOTSTRAP_SDG_RATE || undefined,
       }),
     )
     .then((r) => {
       if (r.skipped) console.log('Database already set up — nothing to do.')
-      else console.log(`Set up done. Sign in as ${r.adminEmail} with the temporary password: ${r.temporaryPassword}\nYou will be asked to change it.`)
+      else console.log(`Set up done. Sign in as ${r.adminEmail} with the temporary password: ${r.temporaryPassword}\nYou will be asked to change it.${process.env.BOOTSTRAP_SDG_RATE ? '' : '\nNo exchange rate was set: add today\'s rate in Finance → Exchange rates before the first payment.'}`)
     })
     .catch((e) => {
       console.error(e)

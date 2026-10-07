@@ -22,20 +22,25 @@ const schema = z.object({
 
 export type Env = z.infer<typeof schema>
 
+// In production the key for saved channel passwords must be its own value, so rotating the sign-in secret never makes them unreadable.
+const prod = schema.refine((e) => e.NODE_ENV !== 'production' || !!e.SECRETS_KEY, { message: 'SECRETS_KEY is required in production', path: ['SECRETS_KEY'] })
+
 let cached: Env | undefined
 
 export function env(): Env {
   if (cached) return cached
   // docker compose passes unset optional variables as empty strings
   const raw = Object.fromEntries(Object.entries(process.env).filter(([k, v]) => !(['APP_URL', 'SECRETS_KEY', 'NOTIFY_INTERVAL_SECONDS', 'UPLOAD_DIR', 'MAX_UPLOAD_MB'].includes(k) && v === '')))
-  const parsed = schema.safeParse(raw)
+  const parsed = prod.safeParse(raw)
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n')
     throw new Error(`Invalid environment configuration:\n${issues}`)
   }
   const placeholder = /change-me|dev-only|example|secret-test/i.test(parsed.data.JWT_SECRET)
   if (parsed.data.NODE_ENV === 'production' && (placeholder || new Set(parsed.data.JWT_SECRET).size < 16))
-    throw new Error('JWT_SECRET looks like a placeholder. Generate one with: openssl rand -base64 48')
+    throw new Error('JWT_SECRET looks like a placeholder. Generate one with: openssl rand -hex 32')
+  if (parsed.data.NODE_ENV === 'production' && parsed.data.SECRETS_KEY && /change-me|example/i.test(parsed.data.SECRETS_KEY))
+    throw new Error('SECRETS_KEY looks like a placeholder. Generate one with: openssl rand -hex 32')
   cached = parsed.data
   return cached
 }

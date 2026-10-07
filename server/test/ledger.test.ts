@@ -187,6 +187,12 @@ describe('month close', () => {
     expect(r.body.code).toBe('LEDGER_PERIOD_CLOSED')
   })
 
+  it('keeps the exchange rates of a closed month', async () => {
+    const r = await acc.post('/finance/rates', { date: `${last}-10`, rate: '2111', source: 'late edit' })
+    expect(r.status).toBe(422)
+    expect(r.body.code).toBe('RATE_PERIOD_CLOSED')
+  })
+
   it('can be reopened by the finance manager, with a reason', async () => {
     expect((await fm.post(`/finance/close/${last}/dgl/reopen`, { reason: 'Late invoice from the pharmacy' })).status).toBe(200)
   })

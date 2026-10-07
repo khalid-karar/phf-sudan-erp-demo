@@ -35,6 +35,17 @@ function ownOffice(u: AuthUser, officeId: string) {
   if (limited && limited !== officeId) throw forbidden({ ar: 'هذا المكتب ليس مكتبك', en: 'That is not your office' })
 }
 
+/** An office-limited user may open or reverse only entries that touch their own office. */
+function assertEntryOffice(u: AuthUser, lines: { officeId: string | null }[]) {
+  const limited = scopeOffice(u)
+  if (limited && lines.some((l) => l.officeId !== limited)) throw forbidden({ ar: 'هذا القيد ليس لمكتبك', en: 'That entry is not for your office' })
+}
+
+/** Organisation-wide figures are not for office-limited accounts. */
+function wholeOrg(u: AuthUser) {
+  if (scopeOffice(u)) throw forbidden({ ar: 'هذا التقرير لكل المؤسسة ولا يتاح لحسابات المكاتب', en: 'This report covers the whole organisation and is not available to office-limited accounts' })
+}
+
 @UseInterceptors(KickNotifications)
 @Controller('finance')
 export class LedgerController {
@@ -96,8 +107,10 @@ export class LedgerController {
 
   @Perm('finance', 'view')
   @Get('journal/:id')
-  entry(@Param('id') id: string) {
-    return this.accounts.entry(id)
+  async entry(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    const e = await this.accounts.entry(id)
+    assertEntryOffice(u, e.lines)
+    return e
   }
 
   @Perm('finance', 'edit')
@@ -108,7 +121,8 @@ export class LedgerController {
 
   @Perm('finance', 'manage')
   @Post('journal/:id/reverse')
-  reverse(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new Zod(reverseBody)) b: z.infer<typeof reverseBody>) {
+  async reverse(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new Zod(reverseBody)) b: z.infer<typeof reverseBody>) {
+    assertEntryOffice(u, (await this.accounts.entry(id)).lines)
     return this.accounts.reverse(u, id, b)
   }
 
@@ -214,13 +228,15 @@ export class LedgerController {
 
   @Perm('finance', 'view')
   @Get('reports/activities')
-  activities(@Query(new Zod(reportQuery)) q: z.infer<typeof reportQuery>) {
+  activities(@CurrentUser() u: AuthUser, @Query(new Zod(reportQuery)) q: z.infer<typeof reportQuery>) {
+    wholeOrg(u)
     return this.close.activities(q)
   }
 
   @Perm('finance', 'view')
   @Get('reports/budget-vs-actual/:projectId')
-  bva(@Param('projectId') id: string) {
+  bva(@CurrentUser() u: AuthUser, @Param('projectId') id: string) {
+    wholeOrg(u)
     return this.close.budgetVsActual(id)
   }
 }

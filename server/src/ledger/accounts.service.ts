@@ -118,6 +118,9 @@ export class AccountsService {
 
   async addRate(user: AuthUser, b: z.infer<typeof rateBody>) {
     return this.db.transaction(async (tx) => {
+      // A month that an office has closed keeps the rates it was closed with.
+      const closed = await tx.execute<{ n: number }>(sql`select count(*)::int as n from period_closes where period = ${b.date.slice(0, 7)} and closed_at is not null`)
+      if (closed.rows[0].n > 0) throw unprocessable('RATE_PERIOD_CLOSED', { ar: 'الشهر مقفل في أحد المكاتب؛ لا يمكن تغيير سعر الصرف فيه', en: 'An office has closed that month, so its exchange rate cannot be changed' })
       const [r] = await tx.insert(exchangeRates).values(b).onConflictDoUpdate({ target: exchangeRates.date, set: { rate: b.rate, source: b.source } }).returning()
       await audit(tx, user, 'rate.set', 'exchange_rate', b.date, b)
       return r

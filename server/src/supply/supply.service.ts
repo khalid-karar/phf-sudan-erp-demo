@@ -81,6 +81,13 @@ export class SupplyService {
   async updateItem(user: AuthUser, id: string, b: z.infer<typeof itemPatch>) {
     return this.db.transaction(async (tx) => {
       if (b.expenseAccountCode) await this.assertExpenseAccount(tx, b.expenseAccountCode)
+      // Changing the unit value while stock is on hand would value receipts and issues differently and the inventory account would drift.
+      if (b.unitValue !== undefined) {
+        const [cur] = await tx.select({ v: items.unitValue }).from(items).where(eq(items.id, id))
+        const [onHand] = (await tx.execute<{ n: number }>(sql`select coalesce(sum(qty),0)::int as n from stock_levels where item_id = ${id}`)).rows
+        if (cur && Number(cur.v) !== Number(b.unitValue) && onHand.n > 0)
+          throw unprocessable('STOCK_ON_HAND', { ar: 'لا يمكن تغيير قيمة الوحدة والصنف موجود في المخازن', en: 'The unit value cannot change while the item is in stock' }, { onHand: onHand.n })
+      }
       const [it] = await tx.update(items).set(b).where(eq(items.id, id)).returning()
       if (!it) throw notFound({ ar: 'الصنف', en: 'Item' })
       await audit(tx, user, 'item.update', 'item', id, b)
