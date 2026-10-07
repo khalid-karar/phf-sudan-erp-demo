@@ -10,6 +10,8 @@ export interface Usage {
 }
 
 export interface BudgetData {
+  /** Live mode: the server's own figure for every line. It already counts every office's spending, which a field officer's screen does not carry. */
+  serverUsage?: Record<string, Usage> | null
   expenses: Expense[]
   requests: SpendRequest[]
   reallocations: Reallocation[]
@@ -27,6 +29,15 @@ export function reallocDelta(lineId: string, d: BudgetData) {
 }
 
 export function lineUsage(line: BudgetLine, d: BudgetData, excludeRequestId?: string): Usage {
+  const server = d.serverUsage?.[line.id]
+  if (server) {
+    // Re-checking one request against everything else: take its own amount back out of what is reserved.
+    const own = excludeRequestId ? d.requests.find((r) => r.id === excludeRequestId && r.lineId === line.id) : undefined
+    if (!own) return server
+    const pending = server.pending - (own.status === 'pending' ? own.amountUSD : 0)
+    const committed = server.committed - (own.status === 'approved' ? own.amountUSD : 0)
+    return { ...server, pending, committed, available: server.ceiling - server.spent - committed - pending }
+  }
   const ceiling = line.ceilingUSD + reallocDelta(line.id, d)
   const spent = sum(d.expenses.filter((e) => e.lineId === line.id).map((e) => e.amountUSD))
   const reqs = d.requests.filter((r) => r.lineId === line.id && r.id !== excludeRequestId)

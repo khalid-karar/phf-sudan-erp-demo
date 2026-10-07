@@ -57,6 +57,13 @@
       "when": 1791348262992,
       "tag": "0007_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791349142937,
+      "tag": "0008_office_manager",
+      "breakpoints": true
     }
   ]
 }

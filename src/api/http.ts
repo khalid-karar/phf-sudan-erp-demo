@@ -8,13 +8,16 @@ export const API = base ? `${base}/api/v1` : ''
 
 /** A failure the screens can show as it is: a stable code and a message in both languages. */
 export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    readonly msg: Bi,
-    readonly details?: unknown,
-  ) {
+  status: number
+  code: string
+  msg: Bi
+  details?: unknown
+  constructor(status: number, code: string, msg: Bi, details?: unknown) {
     super(msg.en)
+    this.status = status
+    this.code = code
+    this.msg = msg
+    this.details = details
   }
 }
 

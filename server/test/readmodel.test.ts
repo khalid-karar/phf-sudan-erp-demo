@@ -54,3 +54,26 @@ describe('cash spending rows', () => {
     expect(rows.some((r) => !r.hasTechReport)).toBe(true) // spending nobody has reported on yet
   })
 })
+
+describe('people directory', () => {
+  it('gives every signed-in user the names they need, without phone numbers', async () => {
+    const r = await fo.get('/users/directory')
+    expect(r.status).toBe(200)
+    expect(r.body.length).toBeGreaterThan(5)
+    expect(r.body[0]).toHaveProperty('nameAr')
+    expect(JSON.stringify(r.body)).not.toContain('+249')
+    expect((await fo.get('/users')).status).toBe(403) // the full list stays with settings managers
+  })
+})
+
+describe('office manager', () => {
+  it('is kept on the office, and must be a real active person', async () => {
+    const offices = (await admin.get('/offices')).body
+    expect(offices.find((o: { id: string }) => o.id === 'khr').managerId).toBe('u-ed')
+    expect((await admin.patch('/offices/ksl', { managerId: 'u-sup' })).body.managerId).toBe('u-sup')
+    const bad = await admin.patch('/offices/ksl', { managerId: 'nobody' })
+    expect(bad.status).toBe(422)
+    expect(bad.body.code).toBe('UNKNOWN_USER')
+    expect((await admin.patch('/offices/ksl', { managerId: null })).body.managerId).toBeNull()
+  })
+})

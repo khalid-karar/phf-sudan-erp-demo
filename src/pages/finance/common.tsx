@@ -15,6 +15,10 @@ export const sourceName: Record<JournalSource, { ar: string; en: string }> = {
   settlement: { ar: 'تسوية عهدة', en: 'Settlement' },
   fx: { ar: 'فروق عملة', en: 'FX' },
   transfer: { ar: 'تحويل', en: 'Transfer' },
+  payroll: { ar: 'رواتب', en: 'Payroll' },
+  stock: { ar: 'مخزون', en: 'Stock' },
+  manual: { ar: 'قيد يدوي', en: 'Manual entry' },
+  reversal: { ar: 'قيد عكسي', en: 'Reversal' },
 }
 
 export const methodName: Record<PayMethod | 'transfer', { ar: string; en: string }> = {

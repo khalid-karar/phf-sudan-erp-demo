@@ -58,8 +58,15 @@ export class OrgService {
     return this.db.select().from(offices).orderBy(asc(offices.type), asc(offices.nameEn))
   }
 
+  private async checkManager(tx: DbOrTx, managerId: string | null | undefined) {
+    if (!managerId) return
+    const [u] = await tx.select({ id: users.id }).from(users).where(and(eq(users.id, managerId), eq(users.active, true)))
+    if (!u) throw unprocessable('UNKNOWN_USER', { ar: 'مدير المكتب غير موجود أو غير نشط', en: 'The office manager does not exist or is not active' })
+  }
+
   async createOffice(user: AuthUser, b: z.infer<typeof officeBody>) {
     return this.db.transaction(async (tx) => {
+      await this.checkManager(tx, b.managerId)
       const [o] = await tx.insert(offices).values(b).returning()
       // Every office gets its own SDG cash box in the chart of accounts.
       const [key] = await tx.select().from(ledgerAccounts).where(eq(ledgerAccounts.key, 'cash_boxes'))
@@ -79,6 +86,7 @@ export class OrgService {
         const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(users).where(and(eq(users.officeId, id), eq(users.active, true)))
         if (n > 0) throw conflict('OFFICE_HAS_USERS', { ar: `لا يمكن إيقاف المكتب: عليه ${n} مستخدمين نشطين`, en: `Cannot deactivate: ${n} active users belong to this office` })
       }
+      await this.checkManager(tx, b.managerId)
       const [o] = await tx.update(offices).set(b).where(eq(offices.id, id)).returning()
       if (!o) throw notFound({ ar: 'المكتب', en: 'Office' })
       await audit(tx, user, 'office.update', 'office', id, b)
@@ -127,6 +135,13 @@ export class OrgService {
   }
 
   // ── Users ──
+  directory() {
+    return this.db
+      .select({ id: users.id, email: users.email, nameAr: users.nameAr, nameEn: users.nameEn, roleId: users.roleId, officeId: users.officeId, active: users.active })
+      .from(users)
+      .orderBy(asc(users.nameEn))
+  }
+
   listUsers() {
     return this.db.select(publicUser).from(users).orderBy(asc(users.nameEn))
   }

@@ -5,6 +5,7 @@
 // database triggers in migrations/0001_ledger_guards.sql, not only by application code.
 import { sql } from 'drizzle-orm'
 import {
+  type AnyPgColumn,
   bigserial,
   boolean,
   check,
@@ -61,6 +62,7 @@ export const offices = pgTable('offices', {
   lat: doublePrecision('lat'),
   lon: doublePrecision('lon'),
   phone: text('phone'),
+  managerId: text('manager_id').references((): AnyPgColumn => users.id), // who runs the office (shown on the offices screen)
   active: boolean('active').notNull().default(true),
   createdAt: createdAt(),
 })

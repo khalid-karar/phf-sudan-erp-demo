@@ -28,6 +28,7 @@ export const officeBody = z.object({
   lat: z.number().min(-90).max(90).nullable().optional(),
   lon: z.number().min(-180).max(180).nullable().optional(),
   phone: z.string().max(40).nullable().optional(),
+  managerId: z.string().min(1).nullable().optional(),
   active: z.boolean().default(true),
 })
 export const officePatch = officeBody.omit({ id: true }).partial()

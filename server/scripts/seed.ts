@@ -5,7 +5,7 @@
  *
  *   SEED_PASSWORD=... npm run db:seed        (wipes and reloads every table)
  */
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { hashPassword } from '../src/auth/passwords'
 import { fromCents, toCents, toRate4, usdToSdg } from '../src/lib/money'
 import { post } from '../src/ledger/posting'
@@ -53,6 +53,7 @@ export async function seed(db: DbOrTx, password: string) {
   await db.insert(t.users).values(
     demoSeed.users.map((u) => ({ id: u.id, email: u.email!, nameAr: u.name.ar, nameEn: u.name.en, phone: u.phone ?? null, passwordHash, roleId: u.role, officeId: u.officeId, active: u.active !== false })),
   )
+  for (const o of demoSeed.offices) if (o.managerId) await db.update(t.offices).set({ managerId: o.managerId }).where(eq(t.offices.id, o.id))
 
   // Chart of accounts and the accounts that play system roles.
   await db.insert(t.accounts).values(

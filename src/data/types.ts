@@ -7,6 +7,7 @@ export type RoleKey = string
 
 export type ModuleKey = 'dashboard' | 'projects' | 'activities' | 'finance' | 'supply' | 'logistics' | 'patients' | 'hr' | 'reports' | 'alerts' | 'settings'
 export type Access = 'none' | 'view' | 'edit' | 'manage'
+export const MODULE_KEYS: ModuleKey[] = ['dashboard', 'projects', 'activities', 'finance', 'supply', 'logistics', 'patients', 'hr', 'reports', 'alerts', 'settings']
 
 export interface Role {
   id: RoleKey
@@ -203,7 +204,7 @@ export interface JournalLine {
   lineId?: string
 }
 
-export type JournalSource = 'opening' | 'payment' | 'receipt' | 'advance' | 'settlement' | 'fx' | 'transfer'
+export type JournalSource = 'opening' | 'payment' | 'receipt' | 'advance' | 'settlement' | 'fx' | 'transfer' | 'payroll' | 'stock' | 'manual' | 'reversal'
 
 export interface JournalEntry {
   id: string
@@ -297,6 +298,7 @@ export interface Advance {
   id: string
   no: string
   staffId: string
+  holderName?: string // who holds the cash (live mode: the name given when it was issued)
   officeId: string
   projectId: string
   lineId: string

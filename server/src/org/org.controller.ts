@@ -64,6 +64,12 @@ export class OrgController {
     await this.org.deleteRole(u, id)
   }
 
+  // Names for showing who asked, approved or reported; no phone numbers or sign-in details.
+  @Get('users/directory')
+  directory() {
+    return this.org.directory()
+  }
+
   @Perm('settings', 'manage')
   @Get('users')
   users() {
