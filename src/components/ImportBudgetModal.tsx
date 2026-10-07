@@ -3,6 +3,8 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, ApiError, LIVE } from '../api/http'
 import { errorText, refreshData } from '../api/live'
+import { parseIce, type IceParsed } from '../lib/ice/ice'
+import { localAccount } from '../lib/ice/natures'
 import { useLang } from '../lib/i18n'
 import { useStore } from '../lib/store'
 import { Button, Field, inputCls, Modal } from './ui'
@@ -22,6 +24,37 @@ interface Preview {
   warnings: { row: number; en: string; ar: string }[]
 }
 
+function summarize(p: IceParsed): Preview {
+  const cents = (v: string) => Math.round(Number(v) * 100)
+  const rate = p.rate
+  const sdg = (c: number) => (rate ? String(Math.round((c * rate) / 100)) : null)
+  const acts = new Map<string, { code: string; title: string; lines: number; c: number }>()
+  const states = new Map<string, number>()
+  let total = 0
+  for (const l of p.lines) {
+    const c = cents(l.totalUsd)
+    total += c
+    const a = acts.get(l.activityCode) ?? { code: l.activityCode, title: l.activityTitle, lines: 0, c: 0 }
+    a.lines++
+    a.c += c
+    acts.set(l.activityCode, a)
+    states.set(l.state || '—', (states.get(l.state || '—') ?? 0) + c)
+  }
+  return {
+    sheet: p.sheet, ipCode: p.ipCode, rate, startDate: p.startDate, endDate: p.endDate, lineCount: p.lines.length, totalUsd: String(total / 100), totalSdg: sdg(total),
+    activities: [...acts.values()].map((a) => ({ code: a.code, title: a.title, lines: a.lines, usd: String(a.c / 100), sdg: sdg(a.c) })),
+    states: [...states].map(([key, c]) => ({ key, usd: String(c / 100), sdg: sdg(c) })).sort((a, b) => Number(b.usd) - Number(a.usd)),
+    noNature: p.lines.filter((l) => !l.nature).length,
+    warnings: p.warnings,
+  }
+}
+const parseErr = (e: unknown) => {
+  const m = e instanceof Error ? e.message : ''
+  if (m === 'NO_SHEET' || m.startsWith('NO_COLUMN')) return { ar: 'لم أجد جدول الميزانية (عمود Activity ID) في الملف', en: 'No budget table (an "Activity ID" column) was found in the file' }
+  if (m === 'NO_ROWS') return { ar: 'لا توجد بنود بمبالغ في الملف', en: 'The file has no budget rows with an amount' }
+  return { ar: 'الملف ليس ملف Excel (.xlsx) صالحاً', en: 'That is not a valid Excel (.xlsx) file' }
+}
+
 const n0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 36)
 
@@ -30,6 +63,8 @@ export function ImportBudgetModal({ onClose }: { onClose: () => void }) {
   const ar = useLang() === 'ar'
   const nav = useNavigate()
   const toast = useStore((s) => s.toast)
+  const st = useStore()
+  const [parsed, setParsed] = useState<IceParsed | null>(null)
   const input = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [pv, setPv] = useState<Preview | null>(null)
@@ -45,13 +80,20 @@ export function ImportBudgetModal({ onClose }: { onClose: () => void }) {
     if (!fl) return
     setBusy(true)
     try {
-      const fd = new FormData()
-      fd.append('file', fl)
-      const p = await api.upload<Preview>('/projects/import/preview', fd)
+      let p: Preview
+      if (LIVE) {
+        const fd = new FormData()
+        fd.append('file', fl)
+        p = await api.upload<Preview>('/projects/import/preview', fd)
+      } else {
+        const parsed = await parseIce(await fl.arrayBuffer())
+        setParsed(parsed)
+        p = summarize(parsed)
+      }
       setPv(p)
       setF((x) => ({ ...x, id: x.id || slug(p.ipCode ?? fl.name.replace(/\.xlsx$/i, '')), code: p.ipCode ?? x.code, startDate: p.startDate ?? x.startDate, endDate: p.endDate ?? x.endDate, rate: p.rate ? String(p.rate) : x.rate }))
     } catch (e) {
-      const t = errorText(e)
+      const t = LIVE ? errorText(e) : parseErr(e)
       setErr(ar ? t.ar : t.en)
     }
     setBusy(false)
@@ -63,6 +105,31 @@ export function ImportBudgetModal({ onClose }: { onClose: () => void }) {
     setBusy(true)
     setErr('')
     try {
+      if (!LIVE) {
+        if (!parsed) return
+        const expense = st.accounts.filter((a) => a.type === 'expense' && a.postable)
+        const acc = (n: string | null) => (expense.find((a) => a.code === localAccount(n)) ?? expense[0])?.code ?? ''
+        const order = [...new Set(parsed.lines.map((l) => l.activityCode))]
+        let seq = 0
+        await st.addProject({
+          code: f.code.trim(),
+          name: { ar: f.nameAr.trim(), en: f.nameEn.trim() },
+          donor: { ar: f.donorAr.trim(), en: f.donorEn.trim() },
+          start: f.startDate,
+          end: f.endDate,
+          controlMode: f.controlMode as 'hard' | 'soft',
+          tolerancePct: f.controlMode === 'soft' ? Number(f.tolerancePct) : 0,
+          pillars: order.map((code) => {
+            const ls = parsed.lines.filter((l) => l.activityCode === code)
+            const title = ls[0].activityTitle || code
+            return { code: code.slice(0, 20), name: { ar: title, en: title }, lines: ls.map((l) => ({ code: `B${String(++seq).padStart(3, '0')}`, name: { ar: `${l.item}${l.state ? ` [${l.state}]` : ''}`, en: `${l.item}${l.state ? ` [${l.state}]` : ''}` }, ceilingUSD: Number(l.totalUsd), account: acc(l.nature) })) }
+          }),
+        })
+        toast({ ar: `أُنشئ المشروع من الملف: ${order.length} نشاطاً و${parsed.lines.length} بنداً`, en: `Project created from the file: ${order.length} activities, ${parsed.lines.length} lines` }, 'ok')
+        onClose()
+        nav('/projects')
+        return
+      }
       const fd = new FormData()
       fd.append('file', file)
       for (const [k, v] of Object.entries(f)) if (v !== '' && !(k === 'tolerancePct' && f.controlMode !== 'soft')) fd.append(k, v)
@@ -82,16 +149,11 @@ export function ImportBudgetModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title={ar ? 'استيراد ميزانية من ملف المانح' : 'Import a budget from the donor file'} wide>
       <div className="space-y-5">
-        {!LIVE && (
-          <div className="rounded-md border border-line bg-sand p-3 text-[13.5px]">
-            {ar ? 'هذه النسخة تجريبية داخل المتصفح. قراءة ملف المانح وإنشاء المشروع منه تعمل عند ربط النظام بالخادم (الوضع الحي).' : 'This is the in-browser demo. Reading the donor file and building the project from it works when the system is connected to the server (live mode).'}
-          </div>
-        )}
         <p className="text-[13.5px] text-muted">
           {ar ? 'ارفع ملف الميزانية (Excel) الذي أرسله المانح. يُنشأ المشروع ومحاوره (الأنشطة) وبنوده وسقوفها تلقائياً بدل الإدخال اليدوي، ويُحفظ الملف الأصلي مع المشروع.' : 'Upload the budget workbook (Excel) from the donor. The project, its activities and budget lines with their ceilings are created automatically instead of typing them, and the original file is kept with the project.'}
         </p>
         <input ref={input} type="file" accept=".xlsx" hidden onChange={(e) => pick(e.target.files?.[0] ?? null)} />
-        <button type="button" disabled={!LIVE} onClick={() => input.current?.click()} className="flex w-full items-center gap-3 rounded-lg border-2 border-dashed border-line p-4 text-start hover:border-nile-2">
+        <button type="button" onClick={() => input.current?.click()} className="flex w-full items-center gap-3 rounded-lg border-2 border-dashed border-line p-4 text-start hover:border-nile-2">
           {file ? <FileSpreadsheet className="text-leaf" /> : <Upload className="text-muted" />}
           <span className="text-[14.5px]">{file ? file.name : ar ? 'اختر ملف الميزانية (.xlsx)' : 'Choose the budget file (.xlsx)'}</span>
         </button>
