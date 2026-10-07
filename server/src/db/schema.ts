@@ -704,3 +704,52 @@ export const payrollRuns = pgTable(
   },
   (t) => [uniqueIndex('payroll_one_posted_per_period').on(t.period).where(sql`${t.status} = 'posted'`)],
 )
+
+// ─── Patients (beneficiaries) ────────────────────────────────────────────────
+// Personal data: reads and writes go through the "patients" permission and office scope.
+
+export const serviceType = pgEnum('service_type', ['consultation', 'surgery', 'medicines', 'nutrition', 'vaccination', 'referral', 'maternal'])
+
+export const beneficiaries = pgTable(
+  'beneficiaries',
+  {
+    id: id(),
+    no: text('no').notNull().unique(),
+    nameAr: text('name_ar').notNull(),
+    nameEn: text('name_en'),
+    nameKey: text('name_key').notNull(), // normalised Arabic + English name, for search and duplicate checks
+    gender: text('gender').notNull(), // 'm' | 'f'
+    birthYear: integer('birth_year').notNull(),
+    officeId: text('office_id').notNull().references(() => offices.id), // where they were registered
+    locality: text('locality'),
+    displaced: boolean('displaced').notNull().default(false),
+    phone: text('phone'),
+    phoneDigits: text('phone_digits'), // digits only, for matching
+    registeredAt: date('registered_at').notNull(),
+    registeredById: text('registered_by_id').references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('beneficiaries_office_idx').on(t.officeId),
+    index('beneficiaries_birth_gender_idx').on(t.birthYear, t.gender),
+    index('beneficiaries_phone_idx').on(t.phoneDigits),
+    check('beneficiaries_gender', sql`${t.gender} in ('m', 'f')`),
+    check('beneficiaries_birth_year', sql`${t.birthYear} between 1900 and 2100`),
+  ],
+)
+
+export const beneficiaryServices = pgTable(
+  'beneficiary_services',
+  {
+    id: id(),
+    beneficiaryId: text('beneficiary_id').notNull().references(() => beneficiaries.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    type: serviceType('type').notNull(),
+    officeId: text('office_id').notNull().references(() => offices.id), // where the service was given
+    activityId: text('activity_id').references(() => activities.id),
+    note: text('note'),
+    createdById: text('created_by_id').references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [index('services_beneficiary_idx').on(t.beneficiaryId, t.date), index('services_office_date_idx').on(t.officeId, t.date)],
+)

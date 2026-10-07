@@ -8,6 +8,7 @@ The backend for the Kuwait Patients Helping Fund (Sudan) ERP. This first phase c
 - spend requests, reallocations and the approval engine
 - field activities and field reports, including offline re-sends
 - the accounting ledger: chart of accounts, vouchers, cash advances, exchange rates, revaluation, month close and reports
+- patients: the beneficiary register, services received, duplicate detection and statistics
 - people: employees with project salary shares, leave, and the monthly payroll run
 - supply chain and logistics: item catalogue, stock per store, in-kind receipts, issues to activities, write-offs, shipments between offices, fleet and fuel
 
@@ -22,7 +23,7 @@ npm run build
 npm run db:migrate                # creates the tables and the ledger guards
 npm run db:seed                   # demo data: same organisation as the clickable demo
 npm run dev                       # http://localhost:3000/health
-npm test                          # 77 tests against a real database (phf_erp_test)
+npm test                          # 92 tests against a real database (phf_erp_test)
 ```
 
 All seeded demo users sign in with the password `Phf-Demo-2026` (change it with `SEED_PASSWORD`). Their emails are in `../src/data/seed.ts`, for example `finance@kphfs.org` (Finance & Admin Manager), `m.osman@kphfs.org` (field officer, Kassala) and `it@kphfs.org` (system administrator).
@@ -160,6 +161,22 @@ A month can be posted once. Two people pressing "post" together take turns, and 
 
 Salaries are visible only to people who can edit HR records; people with view access see everything else about an employee. Anyone with a linked employee record can request their own leave. Leave approval needs HR edit access, cannot be done by the requester, and deducts the annual balance (refused if it is short). A future approved leave can be cancelled and the days come back. "On leave" is worked out from approved leave, not stored.
 
+### Patients
+
+The register holds personal data, so every route needs the `patients` permission and office-scoped users only see and change people registered at their own office.
+
+**Duplicates.** When someone is registered, the system compares them with everyone at every office. It warns (`DUPLICATE_SUSPECTED`) when:
+- the phone number matches (compared by its last nine digits, so `+249 912 000 111` and `0912000111` are the same), or
+- the name matches, or the first two names match, and the birth years are within two years.
+
+Names are compared in a loose form (Arabic variants such as أ/ا, ة/ه, ى/ي and diacritics are treated as the same). The warning lists only what is needed to recognise the person (number, name, birth year, office). The clerk can confirm they are different people and register anyway. Registrations of the same name take turns, so two clerks cannot both slip past the check at the same moment.
+
+**Merging.** A manager can fold a duplicate into the record to keep: services move across, blanks (phone, English name, locality) are filled from the duplicate, the earliest registration date is kept, and the removed number is recorded in the audit log.
+
+**Services.** A service has a type, a date (not in the future, not before registration) and optionally the activity it belongs to, which must be one of the user's own office. Staff can record services for people registered at their own office; numbers run per office (`BEN-KSL-01234`).
+
+**Statistics** (`GET patients/stats`): people registered (women, men, children under 18, over 60, displaced), services by type, by office and by month, and how many different people were served. The parts always add up to the total.
+
 ### Permissions
 
 Every route declares the module and access level it needs, e.g. `@Perm('finance', 'edit')`. On every request, the user and their role are reloaded from the database, so deactivating a user or changing a role takes effect immediately.
@@ -241,11 +258,13 @@ Errors look like `{ code, message: { ar, en }, details? }`, so the app can show 
 | | `POST hr/leave/:id/decision` | hr: edit |
 | Payroll | `GET hr/payroll`, `GET hr/payroll/preview?period=YYYY-MM` | hr: view |
 | | `POST hr/payroll`, `POST hr/payroll/:id/void` | hr: manage |
+| Patients | `GET patients`, `GET patients/:id`, `GET patients/stats` | patients: view |
+| | `POST patients`, `PATCH patients/:id`, `POST patients/:id/services`, `GET patients/duplicates` | patients: edit |
+| | `POST patients/:id/merge` | patients: manage |
 
 ## Next phase
 
 These follow the same patterns as the modules above:
-- beneficiaries
 - notifications engine and email/WhatsApp/SMS delivery
 - HQ report PDF and email sending
 - file attachments for receipts and photos

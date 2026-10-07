@@ -17,6 +17,7 @@ import * as demoSeed from '../../src/data/seed'
 import * as demoFin from '../../src/data/finance'
 import * as demoSup from '../../src/data/supply'
 import * as demoPeople from '../../src/data/people'
+import { digits, nameKey } from '../src/patients/names'
 import type { JournalEntry } from '../../src/data/types'
 
 const day = (iso: string) => iso.slice(0, 10)
@@ -24,7 +25,7 @@ const cents = (n: number) => toCents(n.toFixed(2))
 
 export async function seed(db: DbOrTx, password: string) {
   await db.execute(sql`
-    truncate payroll_runs, leave_requests, employee_allocations, employees, stock_moves, stock_levels, shipment_lines, shipments, fuel_logs, vehicles, items, audit_log, advance_items, advances, vouchers, period_closes, exchange_rates, journal_lines, journal_entries,
+    truncate beneficiary_services, beneficiaries, payroll_runs, leave_requests, employee_allocations, employees, stock_moves, stock_levels, shipment_lines, shipments, fuel_logs, vehicles, items, audit_log, advance_items, advances, vouchers, period_closes, exchange_rates, journal_lines, journal_entries,
       ledger_accounts, approval_steps, reallocations, spend_requests, field_reports, activities, approval_rules,
       budget_lines, pillars, projects, funds, accounts, refresh_tokens, users, roles, offices, org_settings, doc_counters
     restart identity cascade`)
@@ -295,6 +296,25 @@ export async function seed(db: DbOrTx, password: string) {
       createdAt: new Date(l.createdAt),
     })
 
+  // Patients: the beneficiary register and the services each person received.
+  const demoBens = demoPeople.buildBeneficiaries(demoFin.fieldActivities)
+  const benCounters = new Map<string, number>()
+  for (const b of demoBens) {
+    const [row] = await db
+      .insert(t.beneficiaries)
+      .values({
+        no: b.no, nameAr: b.name.ar, nameEn: b.name.en, nameKey: nameKey(b.name.ar, b.name.en), gender: b.gender, birthYear: b.birthYear, officeId: b.officeId,
+        locality: b.locality || null, displaced: b.displaced, phone: b.phone ?? null, phoneDigits: digits(b.phone) || null, registeredAt: day(b.registeredAt),
+        registeredById: b.registeredBy && userIds.has(b.registeredBy) ? b.registeredBy : null,
+      })
+      .returning({ id: t.beneficiaries.id })
+    const m = /^(BEN-[A-Z]+)-(\d+)$/.exec(b.no)
+    if (m) benCounters.set(m[1], Math.max(benCounters.get(m[1]) ?? 0, Number(m[2])))
+    await db.insert(t.beneficiaryServices).values(
+      b.services.map((sv) => ({ beneficiaryId: row.id, date: day(sv.date), type: sv.type, officeId: sv.officeId, activityId: sv.activityId ? (activityId.get(demoFin.fieldActivities.find((a) => a.id === sv.activityId)?.code ?? '') ?? null) : null, note: sv.note ?? null })),
+    )
+  }
+
   // Continue document numbering after the demo's numbers.
   const maxNo = (codes: string[]) => Math.max(0, ...codes.map((c) => Number(c.split('-').pop()) || 0))
   await db.insert(t.docCounters).values([
@@ -303,6 +323,7 @@ export async function seed(db: DbOrTx, password: string) {
     { key: 'ADV', next: maxNo(fin.advances.map((a) => a.no)) + 1 },
     { key: 'PV', next: fin.nextPv },
     { key: 'RV', next: fin.nextRv },
+    ...[...benCounters].map(([key, n]) => ({ key, next: n + 1 })),
     { key: 'EMP', next: Math.max(0, ...demoPeople.employees.map((e) => Number(e.no.split('-').pop()) || 0)) + 1 },
     { key: 'GRN', next: maxNo(sup.moves.filter((m) => m.kind === 'receipt').map((m) => m.no)) + 1 },
     { key: 'ISS', next: maxNo(sup.moves.filter((m) => m.kind === 'issue').map((m) => m.no)) + 1 },

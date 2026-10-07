@@ -5,7 +5,7 @@ import { createDb, createPool } from '../src/db/client'
 import { bootApp, Client, resetDb, USERS } from './helpers'
 
 let app: INestApplication
-let hr: Client, fm: Client, fo: Client, ed: Client
+let hr: Client, fm: Client, fo: Client
 const pool = createPool(process.env.DATABASE_URL ?? 'postgresql://phf:phf@localhost:5432/phf_erp_test')
 const db = createDb(pool)
 const rows = async (q: ReturnType<typeof sql>) => (await db.execute(q)).rows as Record<string, string>[]
@@ -34,7 +34,7 @@ const lineSpent = async (lineId: string) => {
 beforeAll(async () => {
   await resetDb()
   app = await bootApp()
-  ;[hr, fm, fo, ed] = await Promise.all([USERS.hr, USERS.financeManager, USERS.fieldOfficer, USERS.director].map((e) => Client.as(app, e)))
+  ;[hr, fm, fo] = await Promise.all([USERS.hr, USERS.financeManager, USERS.fieldOfficer].map((e) => Client.as(app, e)))
   bank = '1101-01' // HQ cash box, in SDG
 })
 afterAll(async () => {
