@@ -1,6 +1,7 @@
 import { ChevronDown, Lock, Plus, Shuffle, SlidersHorizontal } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { NewProjectModal } from '../components/NewProjectModal'
 import { ReallocationModal } from '../components/ReallocationModal'
 import { Button, PageHeader, Panel, StatusBadge, UsageBar, UsageLegend } from '../components/ui'
 import { lineUsage, pillarUsage, projectUsage, reallocDelta, findLine } from '../lib/budget'
@@ -12,9 +13,18 @@ export function ProjectsList() {
   const lang = useLang()
   const s = useStore()
   const ar = lang === 'ar'
+  const { can } = usePerm()
+  const [creating, setCreating] = useState(false)
   return (
     <div>
       <PageHeader
+        actions={
+          can('projects', 'manage') && (
+            <Button onClick={() => setCreating(true)}>
+              <Plus size={16} /> {ar ? 'مشروع جديد' : 'New project'}
+            </Button>
+          )
+        }
         title={ar ? 'المشاريع والميزانيات' : 'Projects & budgets'}
         sub={ar ? 'كل مشروع مقسّم إلى محاور، وكل محور إلى بنود لها سقف صرف. لا يُصرف أي مبلغ إلا على بند محدد.' : 'Each project is split into pillars, and each pillar into lines with a spending ceiling. Nothing is spent without a line.'}
       />
@@ -49,6 +59,7 @@ export function ProjectsList() {
           )
         })}
       </div>
+      {creating && <NewProjectModal onClose={() => setCreating(false)} />}
     </div>
   )
 }

@@ -220,6 +220,7 @@ interface State {
   addRule: (kind: ApprovalRule['appliesTo']) => void | Promise<boolean>
   removeRule: (id: string) => void | Promise<boolean>
   setProjectControl: (projectId: string, mode: ControlMode, tolerancePct: number) => void
+  addProject: (p: import('../components/NewProjectModal').NewProject) => void | Promise<boolean>
 }
 
 const defaultReportSettings: ReportSettings = {
@@ -1137,11 +1138,33 @@ export const useStore = create<State>()(
   removeRule: (id) => {
     set((s) => ({ rules: s.rules.filter((r) => r.id !== id) }))
   },
+  addProject: (np) => {
+    const slug = np.code.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `prj-${Date.now()}`
+    let id = slug
+    if (get().projects.some((p) => p.id === id)) id = `${slug}-${Date.now().toString(36)}`
+    const project: Project = {
+      id,
+      code: np.code,
+      name: np.name,
+      donor: np.donor,
+      fundId: 'f-cash',
+      start: np.start,
+      end: np.end,
+      controlMode: np.controlMode,
+      tolerancePct: np.tolerancePct,
+      pillars: np.pillars.map((p, i) => {
+        const lines = p.lines.map((l, j) => ({ id: `${id}-p${i + 1}-l${j + 1}`, code: l.code, name: l.name, ceilingUSD: l.ceilingUSD }))
+        return { id: `${id}-p${i + 1}`, code: p.code, name: p.name, ceilingUSD: lines.reduce((t, l) => t + l.ceilingUSD, 0), lines }
+      }),
+    }
+    set((s) => ({ projects: [...s.projects, project] }))
+    get().toast({ ar: `أُنشئ المشروع ${np.code}`, en: `Project ${np.code} created` })
+  },
   setProjectControl: (projectId, mode, tolerancePct) =>
     set((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, controlMode: mode, tolerancePct } : p)) })),
   }),
   {
-    name: LIVE ? 'phf-erp-live-ui-v1' : 'phf-erp-demo-v9',
+    name: LIVE ? 'phf-erp-live-ui-v1' : 'phf-erp-demo-v10',
     storage: createJSONStorage(() => safeStorage),
     partialize: (s) => {
       const { toasts: _t, tourOpen: _o, ...rest } = s

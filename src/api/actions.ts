@@ -99,6 +99,17 @@ export const liveActions = {
     act(() => api.post('/approval-rules', ruleBody({ id: '', name: { ar: 'قاعدة جديدة', en: 'New rule' }, minUSD: 0, maxUSD: null, appliesTo: kind, officeId: null, chain: ['supervisor'], active: false })), { ok: { ar: 'أُضيفت قاعدة — فعّلها بعد ضبطها', en: 'Rule added — switch it on once it is set' } }),
   removeRule: (id: string) => act(() => api.del(`/approval-rules/${id}`), { ok: { ar: 'حُذفت القاعدة', en: 'Rule deleted' } }),
 
+  addProject: (np: import('../components/NewProjectModal').NewProject) => {
+    const slug = np.code.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    const id = slug.length >= 2 ? slug.slice(0, 40) : `prj-${Date.now().toString(36)}`
+    const money = (v: number) => v.toFixed(2)
+    const pillars = np.pillars.map((p) => {
+      const lines = p.lines.map((l) => ({ code: l.code, nameAr: l.name.ar, nameEn: l.name.en, ceilingUsd: money(l.ceilingUSD), expenseAccountCode: l.account }))
+      return { code: p.code, nameAr: p.name.ar, nameEn: p.name.en, ceilingUsd: money(p.lines.reduce((t, l) => t + l.ceilingUSD, 0)), lines }
+    })
+    const ceilingUsd = money(np.pillars.reduce((t, p) => t + p.lines.reduce((a, l) => a + l.ceilingUSD, 0), 0))
+    return act(() => api.post('/projects', { id, code: np.code, nameAr: np.name.ar, nameEn: np.name.en, donorAr: np.donor.ar, donorEn: np.donor.en, startDate: np.start, endDate: np.end, ceilingUsd, controlMode: np.controlMode, tolerancePct: np.tolerancePct, pillars }), { ok: { ar: `أُنشئ المشروع ${np.code}`, en: `Project ${np.code} created` } })
+  },
   setProjectControl: (projectId: string, mode: ControlMode, tolerancePct: number) => {
     useStore.setState((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, controlMode: mode, tolerancePct } : p)) }))
     later(`control:${projectId}`, () => api.patch(`/projects/${projectId}/control`, { controlMode: mode, tolerancePct }))
