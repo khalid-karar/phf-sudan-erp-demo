@@ -8,6 +8,7 @@ The backend for the Kuwait Patients Helping Fund (Sudan) ERP. This first phase c
 - spend requests, reallocations and the approval engine
 - field activities and field reports, including offline re-sends
 - the accounting ledger: chart of accounts, vouchers, cash advances, exchange rates, revaluation, month close and reports
+- people: employees with project salary shares, leave, and the monthly payroll run
 - supply chain and logistics: item catalogue, stock per store, in-kind receipts, issues to activities, write-offs, shipments between offices, fleet and fuel
 
 Stack: Node 22, NestJS 11, PostgreSQL 16, Drizzle ORM. Everything is plain JavaScript plus PostgreSQL, so nothing extra has to be downloaded on the server.
@@ -21,7 +22,7 @@ npm run build
 npm run db:migrate                # creates the tables and the ledger guards
 npm run db:seed                   # demo data: same organisation as the clickable demo
 npm run dev                       # http://localhost:3000/health
-npm test                          # 60 tests against a real database (phf_erp_test)
+npm test                          # 77 tests against a real database (phf_erp_test)
 ```
 
 All seeded demo users sign in with the password `Phf-Demo-2026` (change it with `SEED_PASSWORD`). Their emails are in `../src/data/seed.ts`, for example `finance@kphfs.org` (Finance & Admin Manager), `m.osman@kphfs.org` (field officer, Kassala) and `it@kphfs.org` (system administrator).
@@ -142,6 +143,23 @@ Only the sending office can dispatch a shipment and only the receiving office ca
 
 The alerts endpoint lists items below their minimum, received batches nearing expiry while the store still holds that item (batches are not tracked separately), and vehicles close to their service mileage.
 
+### People and payroll
+
+Each employee can have shares of their salary charged to project budget lines (for example 60% to one line and 40% to another). Whatever is not allocated is charged to the office with no project.
+
+**Payroll run** (one per month):
+- Part months are paid by the day (a joiner or leaver is paid for the days they were employed).
+- Approved unpaid leave is not paid; overlapping requests count each day once.
+- The employee insurance share (`payrollDeductionPct` in the organisation settings, 8% by default) is withheld.
+- Each salary is split by its allocations in pounds, and the last share takes the rounding remainder.
+- The entry is Dr Salaries (by office, project and line), Cr Insurance withheld, Cr the SDG cash box or bank (net pay, in pounds). It goes through the same posting path as everything else.
+
+Before posting, every project share is checked against its budget line, pillar and project ceiling, running through all employees. If any would be exceeded, nothing is posted and the response says which lines (change the shares or move money between lines first). `GET hr/payroll/preview` shows the same check beforehand.
+
+A month can be posted once. Two people pressing "post" together take turns, and the second gets a clear "already posted" message. A wrong run is cancelled with **void**, which posts the full reversing entry and frees the month to be run again. Payroll entries cannot be reversed from the journal, so the run and the books never disagree.
+
+Salaries are visible only to people who can edit HR records; people with view access see everything else about an employee. Anyone with a linked employee record can request their own leave. Leave approval needs HR edit access, cannot be done by the requester, and deducts the annual balance (refused if it is short). A future approved leave can be cancelled and the days come back. "On leave" is worked out from approved leave, not stored.
+
 ### Permissions
 
 Every route declares the module and access level it needs, e.g. `@Perm('finance', 'edit')`. On every request, the user and their role are reloaded from the database, so deactivating a user or changing a role takes effect immediately.
@@ -217,11 +235,16 @@ Errors look like `{ code, message: { ar, en }, details? }`, so the app can show 
 | Fleet | `GET logistics/vehicles`, `GET logistics/vehicles/:id`, `GET logistics/consumption` | logistics: view |
 | | `POST logistics/vehicles` | logistics: manage |
 | | `PATCH logistics/vehicles/:id`, `POST logistics/vehicles/:id/fuel` | logistics: edit |
+| People | `GET hr/me` (any signed-in user), `GET hr/employees`, `GET hr/employees/:id` | hr: view |
+| | `POST hr/employees`, `PATCH hr/employees/:id` | hr: edit |
+| Leave | `GET hr/leave`, `POST hr/leave`, `POST hr/leave/:id/cancel` (own leave, or HR) | signed in |
+| | `POST hr/leave/:id/decision` | hr: edit |
+| Payroll | `GET hr/payroll`, `GET hr/payroll/preview?period=YYYY-MM` | hr: view |
+| | `POST hr/payroll`, `POST hr/payroll/:id/void` | hr: manage |
 
 ## Next phase
 
 These follow the same patterns as the modules above:
-- HR and payroll posting
 - beneficiaries
 - notifications engine and email/WhatsApp/SMS delivery
 - HQ report PDF and email sending

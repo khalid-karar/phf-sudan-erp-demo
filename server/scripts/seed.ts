@@ -16,6 +16,7 @@ import * as t from '../src/db/schema'
 import * as demoSeed from '../../src/data/seed'
 import * as demoFin from '../../src/data/finance'
 import * as demoSup from '../../src/data/supply'
+import * as demoPeople from '../../src/data/people'
 import type { JournalEntry } from '../../src/data/types'
 
 const day = (iso: string) => iso.slice(0, 10)
@@ -23,7 +24,7 @@ const cents = (n: number) => toCents(n.toFixed(2))
 
 export async function seed(db: DbOrTx, password: string) {
   await db.execute(sql`
-    truncate stock_moves, stock_levels, shipment_lines, shipments, fuel_logs, vehicles, items, audit_log, advance_items, advances, vouchers, period_closes, exchange_rates, journal_lines, journal_entries,
+    truncate payroll_runs, leave_requests, employee_allocations, employees, stock_moves, stock_levels, shipment_lines, shipments, fuel_logs, vehicles, items, audit_log, advance_items, advances, vouchers, period_closes, exchange_rates, journal_lines, journal_entries,
       ledger_accounts, approval_steps, reallocations, spend_requests, field_reports, activities, approval_rules,
       budget_lines, pillars, projects, funds, accounts, refresh_tokens, users, roles, offices, org_settings, doc_counters
     restart identity cascade`)
@@ -253,6 +254,47 @@ export async function seed(db: DbOrTx, password: string) {
   )
   await db.insert(t.stockLevels).values(sup.stock.filter((l) => l.qty > 0).map((l) => ({ itemId: l.itemId, officeId: l.officeId, qty: l.qty })))
 
+  // People: employees (with the project shares their salary is charged to) and leave requests.
+  const employeeIds = new Map<string, string>()
+  for (const e of demoPeople.employees) {
+    const [row] = await db
+      .insert(t.employees)
+      .values({
+        no: e.no,
+        nameAr: e.name.ar,
+        nameEn: e.name.en,
+        officeId: e.officeId,
+        positionAr: e.position.ar,
+        positionEn: e.position.en,
+        department: e.department,
+        contract: e.contract,
+        startDate: day(e.startDate),
+        endDate: e.endDate ? day(e.endDate) : null,
+        salarySdg: e.salarySDG.toFixed(2),
+        phone: e.phone ?? null,
+        status: e.status === 'ended' ? 'ended' : 'active',
+        userId: e.userId && userIds.has(e.userId) ? e.userId : null,
+        leaveBalance: e.leaveBalance,
+      })
+      .returning({ id: t.employees.id })
+    employeeIds.set(e.id, row.id)
+    if (e.allocations.length) await db.insert(t.employeeAllocations).values(e.allocations.map((a) => ({ employeeId: row.id, projectId: a.projectId, lineId: a.lineId, pct: a.pct })))
+  }
+  const inclusive = (a: string, b: string) => Math.round((+new Date(b) - +new Date(a)) / 86_400_000) + 1
+  for (const l of demoPeople.leaves)
+    await db.insert(t.leaveRequests).values({
+      employeeId: employeeIds.get(l.employeeId)!,
+      type: l.type,
+      fromDate: day(l.from),
+      toDate: day(l.to),
+      days: inclusive(day(l.from), day(l.to)),
+      note: l.note ?? null,
+      status: l.status,
+      decidedById: l.decidedBy && userIds.has(l.decidedBy) ? l.decidedBy : null,
+      decidedAt: l.status === 'pending' ? null : new Date(l.createdAt),
+      createdAt: new Date(l.createdAt),
+    })
+
   // Continue document numbering after the demo's numbers.
   const maxNo = (codes: string[]) => Math.max(0, ...codes.map((c) => Number(c.split('-').pop()) || 0))
   await db.insert(t.docCounters).values([
@@ -261,6 +303,7 @@ export async function seed(db: DbOrTx, password: string) {
     { key: 'ADV', next: maxNo(fin.advances.map((a) => a.no)) + 1 },
     { key: 'PV', next: fin.nextPv },
     { key: 'RV', next: fin.nextRv },
+    { key: 'EMP', next: Math.max(0, ...demoPeople.employees.map((e) => Number(e.no.split('-').pop()) || 0)) + 1 },
     { key: 'GRN', next: maxNo(sup.moves.filter((m) => m.kind === 'receipt').map((m) => m.no)) + 1 },
     { key: 'ISS', next: maxNo(sup.moves.filter((m) => m.kind === 'issue').map((m) => m.no)) + 1 },
     { key: 'TRF', next: maxNo(sup.moves.filter((m) => m.kind.startsWith('transfer')).map((m) => m.no)) + 1 },

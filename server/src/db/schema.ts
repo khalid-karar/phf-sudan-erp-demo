@@ -45,6 +45,7 @@ export const orgSettings = pgTable('org_settings', {
   localCurrency: text('local_currency').notNull().default('SDG'),
   fiscalYearStartMonth: integer('fiscal_year_start_month').notNull().default(1),
   defaultLang: text('default_lang').notNull().default('ar'),
+  payrollDeductionPct: numeric('payroll_deduction_pct', { precision: 5, scale: 2 }).notNull().default('8.00'), // employee social insurance withheld from salaries
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
 
@@ -610,4 +611,96 @@ export const shipmentLines = pgTable(
     received: integer('received'), // set on delivery; may be less than qty (damage, loss)
   },
   (t) => [uniqueIndex('shipment_lines_unique').on(t.shipmentId, t.itemId), check('shipment_lines_qty', sql`${t.qty} > 0 and (${t.received} is null or (${t.received} >= 0 and ${t.received} <= ${t.qty}))`)],
+)
+
+// ─── Human resources & payroll ───────────────────────────────────────────────
+
+export const department = pgEnum('department', ['medical', 'field', 'finance', 'admin', 'supply', 'logistics'])
+export const contractType = pgEnum('contract_type', ['permanent', 'fixed', 'daily', 'volunteer'])
+export const employeeStatus = pgEnum('employee_status', ['active', 'ended'])
+
+export const employees = pgTable(
+  'employees',
+  {
+    id: id(),
+    no: text('no').notNull().unique(),
+    nameAr: text('name_ar').notNull(),
+    nameEn: text('name_en').notNull(),
+    officeId: text('office_id').notNull().references(() => offices.id),
+    positionAr: text('position_ar').notNull(),
+    positionEn: text('position_en').notNull(),
+    department: department('department').notNull(),
+    contract: contractType('contract').notNull(),
+    startDate: date('start_date').notNull(),
+    endDate: date('end_date'),
+    salarySdg: sdg('salary_sdg').notNull().default('0'), // monthly gross
+    phone: text('phone'),
+    status: employeeStatus('status').notNull().default('active'),
+    userId: text('user_id').unique().references(() => users.id), // the system account, when they have one
+    leaveBalance: integer('leave_balance').notNull().default(0), // annual leave days left
+    createdAt: createdAt(),
+  },
+  (t) => [index('employees_office_idx').on(t.officeId), check('employees_salary_non_negative', sql`${t.salarySdg} >= 0`), check('employees_leave_non_negative', sql`${t.leaveBalance} >= 0`)],
+)
+
+/** The share (%) of an employee's salary charged to a project budget line. */
+export const employeeAllocations = pgTable(
+  'employee_allocations',
+  {
+    employeeId: text('employee_id').notNull().references(() => employees.id, { onDelete: 'cascade' }),
+    projectId: text('project_id').notNull().references(() => projects.id),
+    lineId: text('line_id').notNull().references(() => budgetLines.id),
+    pct: integer('pct').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.employeeId, t.lineId] }), check('allocation_pct', sql`${t.pct} between 1 and 100`)],
+)
+
+export const leaveType = pgEnum('leave_type', ['annual', 'sick', 'emergency', 'unpaid'])
+export const leaveStatus = pgEnum('leave_status', ['pending', 'approved', 'rejected', 'cancelled'])
+
+export const leaveRequests = pgTable(
+  'leave_requests',
+  {
+    id: id(),
+    employeeId: text('employee_id').notNull().references(() => employees.id),
+    type: leaveType('type').notNull(),
+    fromDate: date('from_date').notNull(),
+    toDate: date('to_date').notNull(),
+    days: integer('days').notNull(), // calendar days, inclusive
+    note: text('note'),
+    status: leaveStatus('status').notNull().default('pending'),
+    requestedById: text('requested_by_id').references(() => users.id),
+    decidedById: text('decided_by_id').references(() => users.id),
+    decidedAt: ts('decided_at'),
+    decisionNote: text('decision_note'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('leave_employee_idx').on(t.employeeId, t.fromDate), check('leave_dates', sql`${t.toDate} >= ${t.fromDate} and ${t.days} >= 1`)],
+)
+
+export const payrollStatus = pgEnum('payroll_status', ['posted', 'voided'])
+
+export const payrollRuns = pgTable(
+  'payroll_runs',
+  {
+    id: id(),
+    period: text('period').notNull(), // YYYY-MM
+    date: date('date').notNull(),
+    rate: rate('rate').notNull(), // SDG per USD used
+    headcount: integer('headcount').notNull(),
+    grossSdg: sdg('gross_sdg').notNull(),
+    deductionsSdg: sdg('deductions_sdg').notNull(),
+    netSdg: sdg('net_sdg').notNull(),
+    grossUsd: usd('gross_usd').notNull(),
+    accountCode: text('account_code').notNull().references(() => accounts.code), // where the net pay left from
+    status: payrollStatus('status').notNull().default('posted'),
+    entryId: text('entry_id').notNull().references(() => journalEntries.id),
+    voidEntryId: text('void_entry_id').references(() => journalEntries.id),
+    postedById: text('posted_by_id').references(() => users.id),
+    postedAt: ts('posted_at').notNull().defaultNow(),
+    voidedAt: ts('voided_at'),
+    voidReason: text('void_reason'),
+    detail: jsonb('detail').$type<unknown>().notNull(), // per-employee breakdown as paid
+  },
+  (t) => [uniqueIndex('payroll_one_posted_per_period').on(t.period).where(sql`${t.status} = 'posted'`)],
 )

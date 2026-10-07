@@ -15,6 +15,7 @@ export const settingsBody = z.object({
   logoUrl: z.string().max(500_000).nullable().optional(),
   fiscalYearStartMonth: z.number().int().min(1).max(12),
   defaultLang: z.enum(['ar', 'en']),
+  payrollDeductionPct: z.union([z.string(), z.number()]).transform(String).refine((v) => /^\d{1,2}(\.\d{1,2})?$/.test(v), 'Percent with up to 2 decimals').optional(),
 })
 
 export const officeBody = z.object({
