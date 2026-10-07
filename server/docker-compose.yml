@@ -33,8 +33,13 @@ services:
       NOTIFY_INTERVAL_SECONDS: ${NOTIFY_INTERVAL_SECONDS:-300}
       PORT: 3000
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      UPLOAD_DIR: /data/uploads
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+    volumes:
+      - uploads:/data/uploads
 
-  # Daily compressed dump, 30 days kept, in ./backups on the host.
+  # Daily compressed dump (30 days kept) and a copy of any new uploaded files, in ./backups on the host.
+  # Uploaded files never change once saved, so copying only new ones is a complete, cheap backup.
   backup:
     image: postgres:16
     restart: unless-stopped
@@ -43,10 +48,12 @@ services:
       PGPASSWORD: ${DB_PASSWORD}
     volumes:
       - ./backups:/backups
+      - uploads:/data/uploads:ro
     entrypoint: >
       sh -c 'while true; do
         pg_dump -h db -U phf -d phf_erp -Fc -f /backups/phf_erp_$$(date +%Y-%m-%d).dump &&
         find /backups -name "*.dump" -mtime +30 -delete;
+        mkdir -p /backups/uploads && cp -an /data/uploads/. /backups/uploads/;
         sleep 86400; done'
 
   # HTTPS with automatic certificates. Point the domain's DNS at this server first.
@@ -63,4 +70,5 @@ services:
 
 volumes:
   pgdata:
+  uploads:
   caddy_data:

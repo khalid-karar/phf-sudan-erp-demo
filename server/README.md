@@ -8,6 +8,7 @@ The backend for the Kuwait Patients Helping Fund (Sudan) ERP. This first phase c
 - spend requests, reallocations and the approval engine
 - field activities and field reports, including offline re-sends
 - the accounting ledger: chart of accounts, vouchers, cash advances, exchange rates, revaluation, month close and reports
+- file attachments: receipts, photos and PDFs on activities, field reports, requests, vouchers and advances
 - alerts and notifications: rules, deadlines with an "X days before" warning, in-app inbox, email / WhatsApp / SMS delivery
 - patients: the beneficiary register, services received, duplicate detection and statistics
 - people: employees with project salary shares, leave, and the monthly payroll run
@@ -24,7 +25,7 @@ npm run build
 npm run db:migrate                # creates the tables and the ledger guards
 npm run db:seed                   # demo data: same organisation as the clickable demo
 npm run dev                       # http://localhost:3000/health
-npm test                          # 111 tests against a real database (phf_erp_test)
+npm test                          # 123 tests against a real database (phf_erp_test)
 ```
 
 All seeded demo users sign in with the password `Phf-Demo-2026` (change it with `SEED_PASSWORD`). Their emails are in `../src/data/seed.ts`, for example `finance@kphfs.org` (Finance & Admin Manager), `m.osman@kphfs.org` (field officer, Kassala) and `it@kphfs.org` (system administrator).
@@ -211,6 +212,16 @@ Names are compared in a loose form (Arabic variants such as أ/ا, ة/ه, ى/ي 
 
 **Channel passwords** are encrypted (AES-256-GCM) before they are stored and are never sent back to the screen. Set `SECRETS_KEY` and keep it with your backups; without it, `JWT_SECRET` is used, and changing that would make saved passwords unreadable. A test message can be sent from the settings screen with saved or not-yet-saved settings. The SMS service address must be public https (addresses inside the server's network are refused).
 
+### Attachments
+
+Receipts, photos and PDFs can be attached to an activity, a field report, a spending request, a voucher or an advance (`POST attachments`, a multipart form with `file`, `ownerType`, `ownerId` and an optional `note`).
+
+- **Judged by content.** The type is detected from the file's first bytes, so a program renamed `photo.jpg` is refused whatever the browser claims. Allowed: JPG, PNG, WebP, HEIC and PDF, up to `MAX_UPLOAD_MB` (10 by default), 50 files per record.
+- **Same visibility as the record.** Uploading needs edit access to the record's module and viewing needs view access. Office-scoped users only reach files on their own office's records, so another office gets "not found", not "forbidden".
+- **Removal.** The uploader, or a manager of that module, can remove a file. It is hidden and the removal is in the audit log; the stored bytes are kept.
+- **Storage.** Files are stored once per content under `UPLOAD_DIR` (a docker volume), written then renamed so a half-written file is never visible. The compose file's backup service copies new files to `./backups/uploads` every day, next to the database dump. Downloads need the sign-in token, so the app fetches them and shows them from memory.
+- Files are not scanned for viruses; they are only ever shown as images or downloaded, never executed.
+
 ### Permissions
 
 Every route declares the module and access level it needs, e.g. `@Perm('finance', 'edit')`. On every request, the user and their role are reloaded from the database, so deactivating a user or changing a role takes effect immediately.
@@ -303,12 +314,13 @@ Errors look like `{ code, message: { ar, en }, details? }`, so the app can show 
 | | `POST notification-rules/run` | settings: manage |
 | | `GET deliveries`, `GET channels` | settings: view |
 | | `PUT channels/:channel`, `POST channels/:channel/test` (`email`, `whatsapp`, `sms`) | settings: manage |
+| Attachments | `GET attachments?ownerType=&ownerId=`, `GET attachments/:id/file` (`?download=1`) | view access to the record's module |
+| | `POST attachments`, `DELETE attachments/:id` (own file, or module manager) | edit access to the record's module |
 
 ## Next phase
 
 These follow the same patterns as the modules above:
 - HQ report PDF and email sending
-- file attachments for receipts and photos
 - connecting the React app to this API in place of its in-browser data
 
 The system accounts the ledger needs for stock and payroll (`inventory`, `inkind_revenue`, `salaries`, `payroll_deductions`) are already configured.

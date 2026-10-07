@@ -17,6 +17,7 @@ import { SupplyModule } from './supply/supply.module'
 import { HrModule } from './hr/hr.module'
 import { PatientsModule } from './patients/patients.module'
 import { NotificationsModule } from './notifications/notifications.module'
+import { AttachmentsModule } from './attachments/attachments.module'
 
 @Controller('health')
 class HealthController {
@@ -31,7 +32,7 @@ class HealthController {
 }
 
 @Module({
-  imports: [ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 300 }], skipIf: () => env().NODE_ENV === 'test' }), DbModule, AuthModule, OrgModule, BudgetModule, ApprovalsModule, LedgerModule, ActivitiesModule, SupplyModule, HrModule, PatientsModule, NotificationsModule],
+  imports: [ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 300 }], skipIf: () => env().NODE_ENV === 'test' }), DbModule, AuthModule, OrgModule, BudgetModule, ApprovalsModule, LedgerModule, ActivitiesModule, SupplyModule, HrModule, PatientsModule, NotificationsModule, AttachmentsModule],
   controllers: [HealthController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -14,6 +14,9 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./
 COPY migrations ./migrations
+# Uploaded files live in a volume (see docker-compose.yml); the node user must be able to write to it.
+RUN mkdir -p /data/uploads && chown node:node /data/uploads
+ENV UPLOAD_DIR=/data/uploads
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD node -e "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

@@ -849,3 +849,28 @@ export const channelSettings = pgTable('channel_settings', {
   lastTest: jsonb('last_test').$type<{ at: string; ok: boolean; message: string } | null>(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 })
+
+// ─── Attachments ─────────────────────────────────────────────────────────────
+// Files live on disk (UPLOAD_DIR/<first two hex of sha256>/<sha256>); this table says what each one is and who may see it.
+
+export const attachmentOwner = pgEnum('attachment_owner', ['activity', 'field_report', 'spend_request', 'voucher', 'advance', 'report'])
+
+export const attachments = pgTable(
+  'attachments',
+  {
+    id: id(),
+    ownerType: attachmentOwner('owner_type').notNull(),
+    ownerId: text('owner_id').notNull(),
+    officeId: text('office_id').references(() => offices.id), // the owner's office, for scoping (null for organisation-wide records)
+    fileName: text('file_name').notNull(),
+    mime: text('mime').notNull(), // detected from the file's content, not from what the browser claimed
+    size: integer('size').notNull(),
+    sha256: text('sha256').notNull(),
+    note: text('note'),
+    uploadedById: text('uploaded_by_id').references(() => users.id),
+    createdAt: createdAt(),
+    deletedAt: ts('deleted_at'),
+    deletedById: text('deleted_by_id').references(() => users.id),
+  },
+  (t) => [index('attachments_owner_idx').on(t.ownerType, t.ownerId)],
+)

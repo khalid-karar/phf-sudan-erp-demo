@@ -13,6 +13,9 @@ const schema = z.object({
   SECRETS_KEY: z.string().min(32, 'SECRETS_KEY must be at least 32 characters').optional(),
   // Where people open the app, used for links inside emails and messages (e.g. https://erp.kphfs.org).
   APP_URL: z.string().url().optional(),
+  // Where uploaded files (receipts, photos, reports) are kept. In docker this is a volume that is backed up.
+  UPLOAD_DIR: z.string().default('./uploads'),
+  MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(50).default(10),
   // How often the notification engine looks for new alerts and sends queued messages (0 turns the background loop off).
   NOTIFY_INTERVAL_SECONDS: z.coerce.number().int().min(0).default(300),
 })
@@ -24,7 +27,7 @@ let cached: Env | undefined
 export function env(): Env {
   if (cached) return cached
   // docker compose passes unset optional variables as empty strings
-  const raw = Object.fromEntries(Object.entries(process.env).filter(([k, v]) => !(['APP_URL', 'SECRETS_KEY', 'NOTIFY_INTERVAL_SECONDS'].includes(k) && v === '')))
+  const raw = Object.fromEntries(Object.entries(process.env).filter(([k, v]) => !(['APP_URL', 'SECRETS_KEY', 'NOTIFY_INTERVAL_SECONDS', 'UPLOAD_DIR', 'MAX_UPLOAD_MB'].includes(k) && v === '')))
   const parsed = schema.safeParse(raw)
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n')

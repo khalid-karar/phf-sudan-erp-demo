@@ -7,6 +7,7 @@ export const PASSWORD = 'Test-Pass-2026'
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgresql://phf:phf@localhost:5432/phf_erp_test'
 process.env.JWT_SECRET = 'test-secret-test-secret-test-secret-123'
 process.env.NODE_ENV = 'test'
+process.env.UPLOAD_DIR = process.env.UPLOAD_DIR ?? `${process.env.TMPDIR ?? '/tmp'}/phf-test-uploads`
 
 export const USERS = {
   fieldOfficer: 'm.osman@kphfs.org', // Kassala, office-scoped

@@ -26,3 +26,4 @@ dist-ssr
 # server secrets
 server/.env
 server/backups
+server/uploads
