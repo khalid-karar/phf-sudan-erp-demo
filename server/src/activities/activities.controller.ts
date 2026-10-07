@@ -1,13 +1,39 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
+import type { Response } from 'express'
+import { memoryStorage } from 'multer'
 import type { z } from 'zod'
 import type { AuthUser } from '../auth/auth-user'
 import { CurrentUser, Perm } from '../auth/decorators'
 import { Zod } from '../common/zod'
+import { ExcelService } from './excel.service'
 import { ActivitiesService, activityBody, activityQuery, reportBody } from './activities.service'
 
 @Controller('activities')
 export class ActivitiesController {
-  constructor(private readonly svc: ActivitiesService) {}
+  constructor(
+    private readonly svc: ActivitiesService,
+    private readonly excel: ExcelService,
+  ) {}
+
+  /** The office's offline template (.xlsx). `sample=1` fills in example rows, for training. */
+  @Perm('activities', 'view')
+  @Get('excel/template')
+  async template(@CurrentUser() u: AuthUser, @Query('officeId') officeId: string | undefined, @Query('sample') sample: string | undefined, @Res() res: Response) {
+    const t = await this.excel.template(u, officeId, sample === '1')
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader('Content-Disposition', `attachment; filename="${t.fileName}"`)
+    res.setHeader('Cache-Control', 'no-store')
+    res.end(t.buf)
+  }
+
+  /** Reads a filled-in template. `dryRun=1` only checks it; without it the good rows are filed as reports. */
+  @Perm('activities', 'edit')
+  @Post('excel/import')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } }))
+  import(@CurrentUser() u: AuthUser, @UploadedFile() file: { buffer: Buffer } | undefined, @Query('dryRun') dryRun: string | undefined) {
+    return this.excel.import(u, file, dryRun === '1')
+  }
 
   @Perm('activities', 'view')
   @Get()

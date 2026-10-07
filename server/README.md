@@ -222,6 +222,16 @@ Receipts, photos and PDFs can be attached to an activity, a field report, a spen
 - **Storage.** Files are stored once per content under `UPLOAD_DIR` (a docker volume), written then renamed so a half-written file is never visible. The compose file's backup service copies new files to `./backups/uploads` every day, next to the database dump. Downloads need the sign-in token, so the app fetches them and shows them from memory.
 - Files are not scanned for viruses; they are only ever shown as images or downloaded, never executed.
 
+### Offline Excel template
+
+For offices with weak internet. `GET activities/excel/template?officeId=ksl` downloads that office's workbook (office-limited accounts get their own office's; `sample=1` adds example rows for training). It lists the office's activities still waiting for a report in a dropdown, checks numbers and dates as people type, and carries a hidden stamp with the office and template version. The office fills it in without internet and uploads it later with `POST activities/excel/import` (a multipart form with `file`).
+
+- **Checked row by row.** Each row must name an activity of that office, have a valid date that is not in the future, whole-number counts for men, women and children (not all zero) and a description; the cost is optional. Rows are reported back with the reason in both languages. `?dryRun=1` only checks and saves nothing, so the screen can show a preview first.
+- **Good rows go in, bad rows are listed.** One bad row never blocks the others. Each good row is filed as an ordinary field report (marked "via Excel"), through the same path as an online report, so every rule there applies and each filing is in the audit log.
+- **Safe to upload twice.** A row's idempotency key is made from the file's contents and the activity number, so re-uploading the same file after a dropped connection reports "duplicate" and files nothing twice. An activity that already has a report from anywhere else is refused with a clear message.
+- **Safe to open.** The file must be a real .xlsx within 2 MB, whose table of contents does not claim to unpack into more than 50 MB; at most 200 rows. A template for another office, or an old template version, is refused.
+- Needs edit access to Activities. Office-limited accounts can only use their own office's template.
+
 ### Monthly report to headquarters
 
 `GET reports/monthly?period=YYYY-MM` returns every number the report needs, computed from the ledger and the operational tables (nothing is typed in): money received and spent in the month, exchange gain or loss, each office's spending, activities, beneficiaries and month-close state, how many expenses are matched to a field report, approval volume and average decision time, each project and pillar against its ceiling (with how much of the project's time has passed), cash received and spent to date, open and overdue advances, mismatches between the technical and financial sides, in-kind supplies received and issued, staff, upcoming deadlines and next month's planned activities. Amounts are exact decimal strings in USD. A first-draft summary is written from the numbers in Arabic and English, and the author can edit it.
@@ -324,6 +334,8 @@ Errors look like `{ code, message: { ar, en }, details? }`, so the app can show 
 | | `POST notification-rules/run` | settings: manage |
 | | `GET deliveries`, `GET channels` | settings: view |
 | | `PUT channels/:channel`, `POST channels/:channel/test` (`email`, `whatsapp`, `sms`) | settings: manage |
+| Offline Excel | `GET activities/excel/template` | activities: view |
+| | `POST activities/excel/import` (`?dryRun=1` to only check) | activities: edit |
 | Monthly report | `GET reports/monthly`, `GET reports/delivery`, `GET reports/sent`, `GET report-settings` | reports: view (whole-organisation accounts) |
 | | `PUT reports/hq/:period/draft`, `POST reports/send` | reports: edit |
 | | `POST reports/hq/:period/approve` | reports: edit and the approver role (or settings: manage) |
@@ -335,7 +347,6 @@ Errors look like `{ code, message: { ar, en }, details? }`, so the app can show 
 
 These follow the same patterns as the modules above:
 - sending the HQ report automatically on a set day (needs a server-side PDF)
-- an Excel template for offline offices to fill in and upload field reports
 - connecting the React app to this API in place of its in-browser data
 
 The system accounts the ledger needs for stock and payroll (`inventory`, `inkind_revenue`, `salaries`, `payroll_deductions`) are already configured.
