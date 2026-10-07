@@ -349,8 +349,8 @@ function ReceiveModal({ onClose }: { onClose: () => void }) {
         </Button>
         <Button
           disabled={!valid}
-          onClick={() => {
-            s.receiveSupplies({ officeId, source, lines })
+          onClick={async () => {
+            if ((await s.receiveSupplies({ officeId, source, lines })) === false) return
             onClose()
           }}
         >
@@ -409,8 +409,8 @@ export function Issues() {
           <div className="flex justify-end">
             <Button
               disabled={!valid || !can('supply', 'edit')}
-              onClick={() => {
-                if (s.issueSupplies({ officeId, activityId: activityId || undefined, lines })) setLines([{ itemId: firstItem, qty: 0 }])
+              onClick={async () => {
+                if (await s.issueSupplies({ officeId, activityId: activityId || undefined, lines })) setLines([{ itemId: firstItem, qty: 0 }])
               }}
             >
               <ArrowUpFromLine size={16} /> {ar ? 'صرف المواد' : 'Issue stock'}
@@ -528,9 +528,9 @@ function ItemModal({ item, onClose }: { item: Item; onClose: () => void }) {
         </Button>
         <Button
           disabled={!valid}
-          onClick={() => {
+          onClick={async () => {
             const n = s.items.length + 1
-            s.saveItem({ ...d, id: d.id || `i-${Date.now().toString(36)}`, code: d.code || `ITM-${String(n).padStart(3, '0')}`, name: { ar: d.name.ar || d.name.en, en: d.name.en || d.name.ar } })
+            if ((await s.saveItem({ ...d, id: d.id || `i-${Date.now().toString(36)}`, code: d.code || `ITM-${String(n).padStart(3, '0')}`, name: { ar: d.name.ar || d.name.en, en: d.name.en || d.name.ar } })) === false) return
             onClose()
           }}
         >

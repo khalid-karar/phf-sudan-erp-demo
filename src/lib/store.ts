@@ -113,14 +113,14 @@ interface State {
   stockMoves: StockMove[]
   shipments: Shipment[]
   vehicles: Vehicle[]
-  saveItem: (i: Item) => void
-  receiveSupplies: (d: { officeId: string; source: string; lines: { itemId: string; qty: number; expiry?: string }[] }) => string
-  issueSupplies: (d: { officeId: string; activityId?: string; note?: string; lines: { itemId: string; qty: number }[] }) => string | null
-  createShipment: (d: { fromOfficeId: string; toOfficeId: string; vehicleId?: string; driver?: string; note?: string; lines: ShipmentLine[] }) => Shipment
-  dispatchShipment: (id: string) => boolean
-  receiveShipment: (id: string, received: Record<string, number>) => void
-  saveVehicle: (v: Vehicle) => void
-  addFuel: (vehicleId: string, f: Omit<FuelLog, 'id'>) => void
+  saveItem: (i: Item) => void | Promise<boolean>
+  receiveSupplies: (d: { officeId: string; source: string; lines: { itemId: string; qty: number; expiry?: string }[] }) => string | Promise<boolean>
+  issueSupplies: (d: { officeId: string; activityId?: string; note?: string; lines: { itemId: string; qty: number }[] }) => string | null | Promise<boolean>
+  createShipment: (d: { fromOfficeId: string; toOfficeId: string; vehicleId?: string; driver?: string; note?: string; lines: ShipmentLine[] }) => Shipment | Promise<boolean>
+  dispatchShipment: (id: string) => boolean | Promise<boolean>
+  receiveShipment: (id: string, received: Record<string, number>) => void | Promise<boolean>
+  saveVehicle: (v: Vehicle) => void | Promise<boolean>
+  addFuel: (vehicleId: string, f: Omit<FuelLog, 'id'>) => void | Promise<boolean>
   lowStockCount: () => number
   qtyOf: (itemId: string, officeId: string) => number
 

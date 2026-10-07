@@ -182,9 +182,9 @@ function NewShipment({ onClose }: { onClose: () => void }) {
         </Button>
         <Button
           disabled={!valid}
-          onClick={() => {
+          onClick={async () => {
             const v = s.vehicles.find((x) => x.id === vehicleId)
-            s.createShipment({ fromOfficeId: from, toOfficeId: to, vehicleId: vehicleId || undefined, driver: v?.driver[lang], lines })
+            if ((await s.createShipment({ fromOfficeId: from, toOfficeId: to, vehicleId: vehicleId || undefined, driver: v?.driver[lang], lines })) === false) return
             onClose()
           }}
         >
@@ -231,8 +231,8 @@ function ReceiveShipment({ sh, onClose }: { sh: Shipment; onClose: () => void })
         </Button>
         <Button
           variant="ok"
-          onClick={() => {
-            s.receiveShipment(sh.id, rec)
+          onClick={async () => {
+            if ((await s.receiveShipment(sh.id, rec)) === false) return
             onClose()
           }}
         >
@@ -345,8 +345,8 @@ function FuelModal({ v, onClose }: { v: Vehicle; onClose: () => void }) {
         </Button>
         <Button
           disabled={!liters || odo < v.odometer}
-          onClick={() => {
-            s.addFuel(v.id, { date: new Date().toISOString(), liters, costSDG: cost, odometer: odo, officeId: v.officeId })
+          onClick={async () => {
+            if ((await s.addFuel(v.id, { date: new Date().toISOString(), liters, costSDG: cost, odometer: odo, officeId: v.officeId })) === false) return
             onClose()
           }}
         >

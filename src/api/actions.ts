@@ -1,5 +1,5 @@
 // The store's write actions in live mode: each one asks the server, and the screen then shows what the server holds.
-import type { Account, PayMethod, SettlementItem, FieldActivity, FieldReport, ApprovalRule, ControlMode, Office, OrgSettings, Reallocation, Role, SpendRequest, User } from '../data/types'
+import type { Item, ShipmentLine, Vehicle, FuelLog, Account, PayMethod, SettlementItem, FieldActivity, FieldReport, ApprovalRule, ControlMode, Office, OrgSettings, Reallocation, Role, SpendRequest, User } from '../data/types'
 import { useStore } from '../lib/store'
 import { ApiError, api } from './http'
 import { act, errorText, refreshData } from './live'
@@ -237,6 +237,28 @@ Object.assign(liveActions, {
     return act(() => api.put(`/finance/close/${closingPeriod()}/${officeId}/cash-counted`, { counted: v }))
   },
   closeMonth: (officeId: string) => act(() => api.post(`/finance/close/${closingPeriod()}/${officeId}`, {}), { ok: { ar: 'أُقفل الشهر للمكتب', en: 'Month closed for the office' } }),
+})
+
+Object.assign(liveActions, {
+  saveItem: (i: Item) => {
+    const exists = useStore.getState().items.some((x) => x.id === i.id)
+    const body = { nameAr: i.name.ar, nameEn: i.name.en, unitAr: i.unit.ar, unitEn: i.unit.en, unitValue: String(i.unitValueUSD), minQty: i.min }
+    return act(() => (exists ? api.patch(`/supply/items/${i.id}`, { ...body, active: i.active !== false }) : api.post('/supply/items', { ...body, code: i.code, category: i.category })), { ok: { ar: 'حُفظ الصنف', en: 'Item saved' } })
+  },
+  receiveSupplies: (d: { officeId: string; source: string; lines: { itemId: string; qty: number; expiry?: string }[] }) =>
+    act(() => api.post('/supply/receipts', { officeId: d.officeId, source: d.source, lines: d.lines.filter((l) => l.qty > 0).map((l) => ({ itemId: l.itemId, qty: l.qty, expiry: l.expiry || undefined })) }), { ok: { ar: 'سُجّل الاستلام في المخزن', en: 'Receipt recorded in stock' } }),
+  issueSupplies: (d: { officeId: string; activityId?: string; lines: { itemId: string; qty: number }[] }) => {
+    const a = useStore.getState().activities.find((x) => x.id === d.activityId || x.code === d.activityId)
+    return act(() => api.post('/supply/issues', { officeId: d.officeId, activityId: a?.id ?? d.activityId ?? '', lines: d.lines.filter((l) => l.qty > 0) }), { ok: { ar: 'صُرفت المواد للنشاط', en: 'Stock issued to the activity' } })
+  },
+  createShipment: (d: { fromOfficeId: string; toOfficeId: string; vehicleId?: string; driver?: string; note?: string; lines: ShipmentLine[] }) =>
+    act(() => api.post('/supply/shipments', { fromOfficeId: d.fromOfficeId, toOfficeId: d.toOfficeId, vehicleId: d.vehicleId, driver: d.driver || undefined, note: d.note, lines: d.lines.filter((l) => l.qty > 0).map((l) => ({ itemId: l.itemId, qty: l.qty })) }), { ok: { ar: 'أُنشئت الشحنة', en: 'Shipment created' } }),
+  dispatchShipment: (id: string) => act(() => api.post(`/supply/shipments/${id}/dispatch`, {}), { ok: { ar: 'خرجت الشحنة', en: 'Shipment dispatched' } }),
+  receiveShipment: (id: string, received: Record<string, number>) =>
+    act(() => api.post(`/supply/shipments/${id}/receive`, { lines: Object.entries(received).map(([itemId, r]) => ({ itemId, received: r })) }), { ok: { ar: 'تم تأكيد استلام الشحنة', en: 'Shipment receipt confirmed' } }),
+  saveVehicle: (v: Vehicle) => act(() => api.patch(`/logistics/vehicles/${v.id}`, { status: v.status, driver: v.driver.en || v.driver.ar || null, nextServiceKm: v.nextServiceKm || null }), { ok: { ar: 'حُفظت المركبة', en: 'Vehicle saved' } }),
+  addFuel: (vehicleId: string, f: Omit<FuelLog, 'id'>) =>
+    act(() => api.post(`/logistics/vehicles/${vehicleId}/fuel`, { liters: String(f.liters), costSdg: String(f.costSDG), odometer: f.odometer }), { ok: { ar: 'سُجّل الوقود', en: 'Fuel recorded' } }),
 })
 
 let syncing = false
