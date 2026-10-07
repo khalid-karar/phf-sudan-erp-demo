@@ -135,7 +135,14 @@ export async function seed(db: DbOrTx, password: string) {
   const journal: JournalEntry[] = [...fin.journal, ...sup.journal].sort((a, b) => +new Date(a.date) - +new Date(b.date))
   const sdgAccounts = new Set(demoFin.accounts.filter((a) => a.currency === 'SDG').map((a) => a.code))
   const entryId = new Map<string, string>()
+  // Which activity each spending entry paid for: the demo makes one payment voucher per expense, in date order,
+  // and settles ADV-0015 against ACT-PTS-0044. Carrying that onto the ledger line is what lets the app match spending to field reports.
+  const actOfEntry = new Map<string, string>()
+  const byDate = [...s.expenses].sort((a, b) => +new Date(a.date) - +new Date(b.date))
+  fin.vouchers.filter((v) => v.kind === 'payment').forEach((v, i) => byDate[i]?.activityCode && actOfEntry.set(v.journalId, byDate[i].activityCode!))
+  for (const e of fin.journal) if (e.source === 'settlement' && e.ref === 'ADV-0015') actOfEntry.set(e.id, 'ACT-PTS-0044')
   for (const e of journal) {
+    const code = actOfEntry.get(e.id)
     const lines = e.lines.map((l) => ({
       account: l.account,
       debit: cents(l.debit),
@@ -144,6 +151,7 @@ export async function seed(db: DbOrTx, password: string) {
       officeId: l.officeId ?? 'khr',
       projectId: l.projectId ?? null,
       budgetLineId: l.lineId ?? null,
+      activityId: code && l.lineId && l.debit > 0 ? (activityId.get(code) ?? null) : null,
     }))
     // Float rounding in the demo can leave a cent or two; put it on the largest line so the entry balances.
     const diff = lines.reduce((x, l) => x + l.debit - l.credit, 0)
@@ -158,6 +166,7 @@ export async function seed(db: DbOrTx, password: string) {
 
   // Requests (with their approval history), reallocations and advances.
   const userIds = new Set(demoSeed.users.map((u) => u.id))
+  const requestRow = new Map<string, string>()
   for (const r of s.requests) {
     const [row] = await db
       .insert(t.spendRequests)
@@ -179,6 +188,7 @@ export async function seed(db: DbOrTx, password: string) {
         createdAt: new Date(r.createdAt),
       })
       .returning({ id: t.spendRequests.id })
+    requestRow.set(r.id, row.id)
     if (r.steps.length)
       await db.insert(t.approvalSteps).values(r.steps.map((st, i) => ({ requestId: row.id, seq: i + 1, roleId: st.role, status: st.status, byId: st.by && userIds.has(st.by) ? st.by : null, at: st.at ? new Date(st.at) : null, note: st.note ?? null })))
   }
@@ -188,6 +198,30 @@ export async function seed(db: DbOrTx, password: string) {
       .values({ code: r.code, projectId: r.projectId, fromLineId: r.fromLineId, toLineId: r.toLineId, amountUsd: r.amountUSD.toFixed(2), reason: r.reason.en, status: r.status, requesterId: r.requesterId, createdAt: new Date(r.createdAt) })
       .returning({ id: t.reallocations.id })
     await db.insert(t.approvalSteps).values(r.steps.map((st, i) => ({ reallocationId: row.id, seq: i + 1, roleId: st.role, status: st.status, byId: st.by ?? null, at: st.at ? new Date(st.at) : null })))
+  }
+  // Receipt and payment vouchers for the history above (each points at its journal entry).
+  const payOrder = [...s.expenses].sort((a, b) => +new Date(a.date) - +new Date(b.date))
+  let pvIndex = 0
+  for (const v of fin.vouchers) {
+    const ex = v.kind === 'payment' ? payOrder[pvIndex++] : undefined
+    await db.insert(t.vouchers).values({
+      no: v.no,
+      kind: v.kind,
+      date: day(v.date),
+      method: v.method,
+      accountCode: v.account,
+      currency: v.currency,
+      amount: v.amount.toFixed(2),
+      rate: String(v.rate),
+      amountUsd: v.amountUSD.toFixed(2),
+      party: v.party.en,
+      memo: v.memo.en,
+      officeId: v.officeId,
+      projectId: v.projectId ?? null,
+      lineId: v.lineId ?? null,
+      requestId: ex?.requestId ? (requestRow.get(ex.requestId) ?? null) : null,
+      journalEntryId: entryId.get(v.journalId)!,
+    })
   }
   const staffName = new Map(demoFin.staff.map((x) => [x.id, x.name.en]))
   for (const a of fin.advances) {

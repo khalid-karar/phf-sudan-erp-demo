@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { asc, eq, sql } from 'drizzle-orm'
 import type { z } from 'zod'
-import type { AuthUser } from '../auth/auth-user'
+import { scopeOffice, type AuthUser } from '../auth/auth-user'
 import { audit } from '../common/audit'
 import { notFound, unprocessable } from '../common/errors'
 import type { Db, DbOrTx } from '../db/client'
@@ -29,6 +29,36 @@ export class BudgetService {
       out.push({ ...p, usage: usageJson(u.project) })
     }
     return out
+  }
+
+  /** Every active and finished project as a tree, in one request (the app loads this at start-up). */
+  async trees() {
+    const ps = await this.db.select({ id: projects.id }).from(projects).orderBy(asc(projects.code))
+    const out = []
+    for (const p of ps) out.push(await this.tree(p.id))
+    return out
+  }
+
+  /**
+   * Cash spending posted to budget lines, one row per ledger line, newest last. In-kind issues are not cash and are left out.
+   * Office-limited users get their own office's rows (the budget totals above are organisation-wide either way).
+   */
+  async expenses(user: AuthUser) {
+    const office = scopeOffice(user)
+    const r = await this.db.execute<{ id: string; date: string; line_id: string; project_id: string; office_id: string; amount_usd: string; activity_code: string | null; request_id: string | null; has_tech_report: boolean }>(sql`
+      select jl.id::text as id, je.date::text as date, jl.budget_line_id as line_id, coalesce(jl.project_id, bl.project_id) as project_id, jl.office_id,
+        (jl.debit - jl.credit)::text as amount_usd, a.code as activity_code, coalesce(v.request_id, ad.request_id) as request_id, (fr.id is not null) as has_tech_report
+      from journal_lines jl
+        join accounts ac on ac.code = jl.account_code and ac.type = 'expense'
+        join journal_entries je on je.id = jl.entry_id
+        join budget_lines bl on bl.id = jl.budget_line_id
+        left join activities a on a.id = jl.activity_id
+        left join field_reports fr on fr.activity_id = a.id
+        left join vouchers v on v.journal_entry_id = je.id
+        left join advances ad on ad.settle_entry_id = je.id
+      where je.source <> 'stock' ${office ? sql`and jl.office_id = ${office}` : sql``}
+      order by je.date, jl.id`)
+    return r.rows.map((x) => ({ id: x.id, date: x.date, lineId: x.line_id, projectId: x.project_id, officeId: x.office_id, amountUsd: x.amount_usd, activityCode: x.activity_code, requestId: x.request_id, hasTechReport: x.has_tech_report }))
   }
 
   /** Project → pillars → lines, each with its usage. */

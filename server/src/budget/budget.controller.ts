@@ -17,6 +17,18 @@ export class BudgetController {
   }
 
   @Perm('projects', 'view')
+  @Get('tree')
+  trees() {
+    return this.budget.trees()
+  }
+
+  @Perm('projects', 'view')
+  @Get('expenses')
+  expenses(@CurrentUser() u: AuthUser) {
+    return this.budget.expenses(u)
+  }
+
+  @Perm('projects', 'view')
   @Get(':id')
   tree(@Param('id') id: string) {
     return this.budget.tree(id)
