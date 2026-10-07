@@ -40,7 +40,7 @@ export function Procurement() {
           )
         }
       />
-      <Panel>
+      <Panel className="p-5">
         {loading ? (
           <p className="text-muted">…</p>
         ) : cases.length === 0 ? (

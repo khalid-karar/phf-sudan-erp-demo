@@ -122,10 +122,9 @@ export function ImportBudgetModal({ onClose }: { onClose: () => void }) {
           pillars: order.map((code) => {
             const ls = parsed.lines.filter((l) => l.activityCode === code)
             const title = ls[0].activityTitle || code
-            return { code: code.slice(0, 20), name: { ar: title, en: title }, lines: ls.map((l) => ({ code: `B${String(++seq).padStart(3, '0')}`, name: { ar: `${l.item}${l.state ? ` [${l.state}]` : ''}`, en: `${l.item}${l.state ? ` [${l.state}]` : ''}` }, ceilingUSD: Number(l.totalUsd), account: acc(l.nature) })) }
+            return { code: code.slice(0, 20), name: { ar: title, en: title }, lines: ls.map((l) => ({ code: `B${String(++seq).padStart(3, '0')}`, name: { ar: `${l.item}${l.state ? ` [${l.state}]` : ''}`, en: `${l.item}${l.state ? ` [${l.state}]` : ''}` }, ceilingUSD: Number(l.totalUsd), account: acc(l.nature), detail: { activityCode: l.activityCode, fundCode: l.fundCode, state: l.state, nature: l.nature, donorAccount: l.donorAccount } })) }
           }),
         })
-        toast({ ar: `أُنشئ المشروع من الملف: ${order.length} نشاطاً و${parsed.lines.length} بنداً`, en: `Project created from the file: ${order.length} activities, ${parsed.lines.length} lines` }, 'ok')
         onClose()
         nav('/projects')
         return

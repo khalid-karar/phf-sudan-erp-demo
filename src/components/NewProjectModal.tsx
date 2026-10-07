@@ -14,7 +14,7 @@ export interface NewProject {
   end: string
   controlMode: ControlMode
   tolerancePct: number
-  pillars: { code: string; name: { ar: string; en: string }; lines: { code: string; name: { ar: string; en: string }; ceilingUSD: number; account: string }[] }[]
+  pillars: { code: string; name: { ar: string; en: string }; lines: { code: string; name: { ar: string; en: string }; ceilingUSD: number; account: string; detail?: { activityCode?: string; fundCode?: string; state?: string; nature?: string | null; donorAccount?: string | null } }[] }[]
 }
 
 const today = () => new Date().toISOString().slice(0, 10)

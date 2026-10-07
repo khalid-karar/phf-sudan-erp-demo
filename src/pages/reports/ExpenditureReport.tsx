@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/http'
 import { LIVE } from '../../api/http'
 import { errorText } from '../../api/live'
-import { Button, Field, inputCls, PageHeader, Panel } from '../../components/ui'
+import { Button, Field, inputCls, PageHeader } from '../../components/ui'
+import { demoExpenditure, downloadExpenditureXlsx } from '../../lib/reports/donor'
 import { useLang } from '../../lib/i18n'
 import { useStore } from '../../lib/store'
 
@@ -32,7 +33,8 @@ const n2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFra
 /** The donor's quarterly Detailed Expenditure Report, built from the books. Preview here, download as Excel in the donor's layout. */
 export function ExpenditureReport() {
   const ar = useLang() === 'ar'
-  const projects = useStore((s) => s.projects)
+  const store = useStore()
+  const projects = store.projects
   const [pid, setPid] = useState(projects[0]?.id ?? '')
   const [{ from, to }, setRange] = useState(lastQuarter)
   const [cur, setCur] = useState<'SDG' | 'USD'>('SDG')
@@ -48,7 +50,11 @@ export function ExpenditureReport() {
   }, [pid, from, to, cur, sig])
 
   useEffect(() => {
-    if (!LIVE || !pid || !from || !to || to < from) return
+    if (!pid || !from || !to || to < from) return
+    if (!LIVE) {
+      setData(demoExpenditure(store, pid, from, to, sig))
+      return
+    }
     let live = true
     const t = setTimeout(async () => {
       setBusy(true)
@@ -70,10 +76,15 @@ export function ExpenditureReport() {
       live = false
       clearTimeout(t)
     }
-  }, [query, pid, from, to, ar])
+  }, [query, pid, from, to, ar]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const download = async () => {
     setBusy(true)
+    if (!LIVE) {
+      if (data) await downloadExpenditureXlsx(data, from, to, cur)
+      setBusy(false)
+      return
+    }
     try {
       const b = await api.blob(`/reports/expenditure.xlsx?${query}`)
       const url = URL.createObjectURL(b)
@@ -103,18 +114,14 @@ export function ExpenditureReport() {
         title={ar ? 'تقرير المصروفات التفصيلي (ربع سنوي)' : 'Detailed expenditure report (quarterly)'}
         sub={ar ? 'نفس نموذج المانح: كل معاملة صرف بنشاطها ورمز التمويل وفئة المصروف والحساب، المصرَّح به مقابل الفعلي. تُملأ من دفاتر النظام وتُنزَّل Excel.' : 'The donor’s own layout: every spending transaction with its activity, fund code, expense category and account, authorized against actual. Filled from the books and downloadable as Excel.'}
         actions={
-          LIVE && (
+          (
             <Button onClick={download} disabled={busy || !data}>
               {busy ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} {ar ? 'تنزيل Excel' : 'Download Excel'}
             </Button>
           )
         }
       />
-      {!LIVE ? (
-        <Panel>
-          <p className="text-muted">{ar ? 'هذا التقرير متاح عند ربط النظام بالخادم (الوضع الحي).' : 'This report is available when the system is connected to the server (live mode).'}</p>
-        </Panel>
-      ) : (
+      {(
         <>
           <div className="mb-5 grid gap-3 md:grid-cols-5">
             <Field label={ar ? 'المشروع' : 'Project'}>

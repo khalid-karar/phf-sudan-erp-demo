@@ -54,7 +54,7 @@ export function Documents() {
         title={ar ? 'مستندات الدفع' : 'Payment documents'}
         sub={ar ? 'الطلب المالي وشهادة الإنجاز وخطاب العهدة بقالب المقر، تُملأ من طلب الصرف المعتمد ثم تُطبع (أو تُحفظ PDF).' : 'The payment request, completion certificate and custody letter in the head-office layout, filled from an approved spend request, then printed (or saved as PDF).'}
       />
-      <Panel>
+      <Panel className="p-5">
         <div className="grid gap-3 md:grid-cols-3">
           <Field label={ar ? 'المستند' : 'Document'}>
             <select className={inputCls} value={kind} onChange={(e) => setKind(e.target.value as Kind)}>

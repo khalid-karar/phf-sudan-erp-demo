@@ -574,6 +574,11 @@ export const useStore = create<State>()(
   },
   setUser: (userId) => set({ userId }),
   reset: () => {
+    try {
+      localStorage.removeItem('phf-procurement-demo')
+    } catch {
+      /* storage blocked */
+    }
     set({ ...fresh(), userId: 'u-fo', visited: {}, checklistHidden: [], tourSeen: false })
     get().toast({ ar: 'أُعيدت بيانات العرض إلى وضعها الأصلي', en: 'Demo data restored to its starting point' })
   },
@@ -1153,11 +1158,13 @@ export const useStore = create<State>()(
       controlMode: np.controlMode,
       tolerancePct: np.tolerancePct,
       pillars: np.pillars.map((p, i) => {
-        const lines = p.lines.map((l, j) => ({ id: `${id}-p${i + 1}-l${j + 1}`, code: l.code, name: l.name, ceilingUSD: l.ceilingUSD }))
+        const lines = p.lines.map((l, j) => ({ id: `${id}-p${i + 1}-l${j + 1}`, code: l.code, name: l.name, ceilingUSD: l.ceilingUSD, ...(l.detail ?? {}) }))
         return { id: `${id}-p${i + 1}`, code: p.code, name: p.name, ceilingUSD: lines.reduce((t, l) => t + l.ceilingUSD, 0), lines }
       }),
     }
-    set((s) => ({ projects: [...s.projects, project] }))
+    const map: Record<string, string> = {}
+    np.pillars.forEach((p, i) => p.lines.forEach((l, j) => l.account && (map[`${id}-p${i + 1}-l${j + 1}`] = l.account)))
+    set((s) => ({ projects: [...s.projects, project], lineMap: { ...s.lineMap, ...map } }))
     get().toast({ ar: `أُنشئ المشروع ${np.code}`, en: `Project ${np.code} created` })
   },
   setProjectControl: (projectId, mode, tolerancePct) =>

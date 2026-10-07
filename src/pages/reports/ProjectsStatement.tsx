@@ -2,8 +2,10 @@ import { Download, Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api, LIVE } from '../../api/http'
 import { errorText } from '../../api/live'
-import { Button, Field, inputCls, PageHeader, Panel } from '../../components/ui'
+import { Button, Field, inputCls, PageHeader } from '../../components/ui'
+import { demoStatement, downloadStatementXlsx } from '../../lib/reports/donor'
 import { useLang } from '../../lib/i18n'
+import { useStore } from '../../lib/store'
 
 interface Row {
   id: string; code: string; name: string; donor: string; start: string; end: string; rate: string | null; status: 'active' | 'ended'
@@ -22,13 +24,17 @@ const f = (v: string) => n0.format(Number(v))
 /** Account-statement style summary of every project in USD and SDG, with totals by donor. */
 export function ProjectsStatement() {
   const ar = useLang() === 'ar'
+  const store = useStore()
   const [asOf, setAsOf] = useState(() => new Date().toISOString().slice(0, 10))
   const [d, setD] = useState<Statement | null>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    if (!LIVE) return
+    if (!LIVE) {
+      setD(demoStatement(store, asOf))
+      return
+    }
     let live = true
     setBusy(true)
     api
@@ -39,10 +45,15 @@ export function ProjectsStatement() {
     return () => {
       live = false
     }
-  }, [asOf, ar])
+  }, [asOf, ar]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const download = async () => {
     setBusy(true)
+    if (!LIVE) {
+      if (d) await downloadStatementXlsx(d)
+      setBusy(false)
+      return
+    }
     try {
       const b = await api.blob(`/reports/projects-statement.xlsx?asOf=${asOf}`)
       const url = URL.createObjectURL(b)
@@ -66,18 +77,14 @@ export function ProjectsStatement() {
         title={ar ? 'كشف حساب المشاريع' : 'Projects statement'}
         sub={ar ? 'كل المشاريع بالميزانية والمستلم والمصروف والمتبقي، بالدولار وبالجنيه السوداني، مع إجمالي كل مانح.' : 'Every project with budget, received, spent and remaining, in USD and SDG, with totals by donor.'}
         actions={
-          LIVE && (
+          (
             <Button onClick={download} disabled={busy || !d}>
               {busy ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} {ar ? 'تنزيل Excel' : 'Download Excel'}
             </Button>
           )
         }
       />
-      {!LIVE ? (
-        <Panel>
-          <p className="text-muted">{ar ? 'هذا الكشف متاح عند ربط النظام بالخادم (الوضع الحي).' : 'This statement is available when the system is connected to the server (live mode).'}</p>
-        </Panel>
-      ) : (
+      {(
         <>
           <div className="mb-5 max-w-[220px]">
             <Field label={ar ? 'حتى تاريخ' : 'As of'}>
@@ -137,7 +144,7 @@ export function ProjectsStatement() {
                   </tfoot>
                 </table>
               </div>
-              <h2 className="mb-2 mt-6 text-[17px] font-semibold">{ar ? 'حسب المانح' : 'By donor'}</h2>
+              <h2 className="mb-3 mt-8 text-[17px] font-semibold">{ar ? 'حسب المانح' : 'By donor'}</h2>
               <div className="overflow-auto rounded-lg border border-line bg-surface" dir="ltr">
                 <table className="w-full min-w-[800px] text-[12.5px]">
                   <thead className="bg-sand">

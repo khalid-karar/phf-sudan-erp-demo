@@ -71,6 +71,12 @@ export interface BudgetLine {
   code: string
   name: Bi
   ceilingUSD: number
+  // Donor budget details (set when the project comes from the donor's budget file)
+  activityCode?: string
+  fundCode?: string
+  state?: string
+  nature?: string | null
+  donorAccount?: string | null
 }
 
 export interface Pillar {
