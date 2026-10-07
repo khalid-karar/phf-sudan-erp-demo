@@ -76,7 +76,7 @@ export function FinanceOverview() {
                   <li key={a.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-[14px]">
                     <span className="min-w-0">
                       <span className="num me-2 text-muted">{a.no}</span>
-                      {staff.find((x) => x.id === a.staffId)?.name[lang]}
+                      {a.holderName ?? staff.find((x) => x.id === a.staffId)?.name[lang]}
                       <span className="block text-[12.5px] text-muted">
                         {getOffices().find((o) => o.id === a.officeId)?.name[lang]}
                         {ar ? '، ' : ', '}

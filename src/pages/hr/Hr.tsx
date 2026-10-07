@@ -1,5 +1,6 @@
 import { AlertTriangle, CalendarPlus, Check, Pencil, Plus, Search, UserPlus, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { api, LIVE } from '../../api/http'
 import { Link } from 'react-router-dom'
 import { initialsOf } from '../../components/Layout'
 import { Button, Field, inputCls, Modal, PageHeader, Panel, UsageBar } from '../../components/ui'
@@ -509,6 +510,16 @@ function LeaveModal({ defaultEmp, onClose }: { defaultEmp?: string; onClose: () 
   )
 }
 
+interface PayrollPreview {
+  deductionPct: string
+  grossSdg: string
+  deductionsSdg: string
+  netSdg: string
+  grossUsd: string
+  employees?: { employeeId: string; grossSdg: string; deductionSdg: string; netSdg: string }[]
+  lines: { lineId: string; chargeUsd: string; verdict: string }[]
+}
+
 export function Payroll() {
   const lang = useLang()
   const ar = lang === 'ar'
@@ -517,12 +528,36 @@ export function Payroll() {
   const [period, setPeriod] = useState(lastMonth())
   const rate = s.rates.at(-1)!.rate
   const run = s.payrolls.find((p) => p.period === period)
-  const paid = s.employees.filter((e) => e.status !== 'ended' && e.salarySDG > 0)
-  const total = paid.reduce((t, e) => t + e.salarySDG, 0)
+  // Live: the server works the month out (pay days, unpaid leave, the insurance percentage set in settings) and checks each line's ceiling.
+  const [sv, setSv] = useState<PayrollPreview | null>(null)
+  useEffect(() => {
+    if (!LIVE) return
+    let dead = false
+    setSv(null)
+    api.get<PayrollPreview>(`/hr/payroll/preview?period=${period}`).then((r) => !dead && setSv(r)).catch(() => undefined)
+    return () => {
+      dead = true
+    }
+  }, [period, run?.postedAt])
+  const dedPct = LIVE ? Number(sv?.deductionPct ?? 8) : 8
+  const paid = LIVE
+    ? (sv?.employees ?? []).flatMap((x) => {
+        const e = s.employees.find((y) => y.id === x.employeeId)
+        return e ? [{ e, gross: Number(x.grossSdg), ded: Number(x.deductionSdg), net: Number(x.netSdg) }] : []
+      })
+    : s.employees.filter((e) => e.status !== 'ended' && e.salarySDG > 0).map((e) => ({ e, gross: e.salarySDG, ded: e.salarySDG * 0.08, net: e.salarySDG * 0.92 }))
+  const total = LIVE ? Number(sv?.grossSdg ?? 0) : paid.reduce((t, r) => t + r.gross, 0)
+  const totalDed = LIVE ? Number(sv?.deductionsSdg ?? 0) : total * 0.08
+  const totalNet = LIVE ? Number(sv?.netSdg ?? 0) : total * 0.92
+  const totalUsd = LIVE ? Number(sv?.grossUsd ?? 0) : total / rate
   const byLine = useMemo(() => {
+    if (LIVE) {
+      const lines = (sv?.lines ?? []).map((l) => [l.lineId, Number(l.chargeUsd), l.verdict === 'blocked'] as const)
+      return { lines, overhead: Math.max(0, Number(sv?.grossUsd ?? 0) - lines.reduce((a, l) => a + l[1], 0)) }
+    }
     const m = new Map<string, number>()
     let overhead = 0
-    for (const e of paid) {
+    for (const { e } of paid) {
       let left = 1
       for (const a of e.allocations) {
         m.set(a.lineId, (m.get(a.lineId) ?? 0) + (e.salarySDG * a.pct) / 100 / rate)
@@ -530,8 +565,8 @@ export function Payroll() {
       }
       overhead += (e.salarySDG * left) / rate
     }
-    return { lines: [...m.entries()], overhead }
-  }, [paid, rate])
+    return { lines: [...m.entries()].map(([id, v]) => [id, v, false] as const), overhead }
+  }, [paid, rate, sv])
   return (
     <div>
       <PageHeader
@@ -571,41 +606,49 @@ export function Payroll() {
               <tr className="border-b border-line text-[12.5px] text-muted">
                 <th className="px-5 py-2.5 text-start font-medium">{ar ? 'الموظف' : 'Staff member'}</th>
                 <th className="py-2.5 pe-3 text-end font-medium">{ar ? 'الإجمالي' : 'Gross'}</th>
-                <th className="py-2.5 pe-3 text-end font-medium">{ar ? 'تأمينات 8٪' : 'Insurance 8%'}</th>
+                <th className="py-2.5 pe-3 text-end font-medium">{ar ? `تأمينات ${dedPct}٪` : `Insurance ${dedPct}%`}</th>
                 <th className="px-5 py-2.5 text-end font-medium">{ar ? 'الصافي' : 'Net'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {paid.map((e) => (
+              {LIVE && sv && !sv.employees && (
+                <tr>
+                  <td colSpan={4} className="px-5 py-4 text-[13px] text-muted">
+                    {ar ? 'أرقام الرواتب الفردية ظاهرة لإدارة الموارد البشرية فقط؛ الإجماليات أدناه.' : 'Individual salaries are visible to HR only; the totals are shown below.'}
+                  </td>
+                </tr>
+              )}
+              {paid.map(({ e, gross, ded, net }) => (
                 <tr key={e.id}>
                   <td className="px-5 py-2">
                     {e.name[lang]}
                     <span className="block text-[12px] text-muted">{e.position[lang]}</span>
                   </td>
-                  <td className="num py-2 pe-3 text-end">{num(e.salarySDG)}</td>
-                  <td className="num py-2 pe-3 text-end text-muted">{num(e.salarySDG * 0.08)}</td>
-                  <td className="num px-5 py-2 text-end font-medium">{num(e.salarySDG * 0.92)}</td>
+                  <td className="num py-2 pe-3 text-end">{num(gross)}</td>
+                  <td className="num py-2 pe-3 text-end text-muted">{num(ded)}</td>
+                  <td className="num px-5 py-2 text-end font-medium">{num(net)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-ink/70 font-semibold">
                 <td className="px-5 py-2.5">
-                  {ar ? 'الإجمالي (جنيه)' : 'Total (SDG)'} <span className="num text-[12.5px] font-normal text-muted">≈ {usd(total / rate)}</span>
+                  {ar ? 'الإجمالي (جنيه)' : 'Total (SDG)'} <span className="num text-[12.5px] font-normal text-muted">≈ {usd(totalUsd)}</span>
                 </td>
                 <td className="num py-2.5 pe-3 text-end">{num(total)}</td>
-                <td className="num py-2.5 pe-3 text-end">{num(total * 0.08)}</td>
-                <td className="num px-5 py-2.5 text-end">{num(total * 0.92)}</td>
+                <td className="num py-2.5 pe-3 text-end">{num(totalDed)}</td>
+                <td className="num px-5 py-2.5 text-end">{num(totalNet)}</td>
               </tr>
             </tfoot>
           </table>
         </Panel>
         <Panel title={ar ? 'توزيع التكلفة على المشاريع' : 'Cost split across projects'}>
           <ul className="divide-y divide-line">
-            {byLine.lines.map(([lineId, v]) => {
-              const f = findLine(s.projects, lineId)!
+            {byLine.lines.map(([lineId, v, blocked]) => {
+              const f = findLine(s.projects, lineId)
+              if (!f) return null
               const lu = lineUsage(f.line, s)
-              const over = !run && v > lu.available
+              const over = !run && (LIVE ? blocked : v > lu.available)
               return (
                 <li key={lineId} className="px-5 py-3">
                   <div className="flex items-baseline justify-between gap-2 text-[14px]">

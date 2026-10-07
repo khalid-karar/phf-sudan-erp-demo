@@ -73,7 +73,7 @@ export function Advances() {
           <tbody className="divide-y divide-line">
             {list.map((a) => {
               const act = activityFor(a.activityCode)
-              const st = staff.find((x) => x.id === a.staffId)
+              const st = { name: { ar: a.holderName ?? staff.find((x) => x.id === a.staffId)?.name.ar, en: a.holderName ?? staff.find((x) => x.id === a.staffId)?.name.en } }
               const dd = daysUntil(a.dueAt)
               const late = a.status === 'open' && dd < 0
               return (

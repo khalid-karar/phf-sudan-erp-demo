@@ -230,7 +230,7 @@ function CashPosition() {
       return t + (b.currency === 'SDG' ? v.sdg / rate : v.balance)
     }, 0)
     const adv = s.advances.filter((a) => a.officeId === o.id && a.status === 'open').reduce((t, a) => t + a.amountUSD, 0)
-    const holders = new Set(s.advances.filter((a) => a.officeId === o.id && a.status === 'open').map((a) => staff.find((x) => x.id === a.staffId)?.name[lang]))
+    const holders = new Set(s.advances.filter((a) => a.officeId === o.id && a.status === 'open').map((a) => a.holderName ?? staff.find((x) => x.id === a.staffId)?.name[lang]))
     return { o, sdg: box.sdg, boxUSD: box.sdg / rate, bankUSD, adv, holders: [...holders].filter(Boolean).join(ar ? '، ' : ', ') }
   })
   const tot = rows.reduce((t, r) => ({ box: t.box + r.boxUSD, bank: t.bank + r.bankUSD, adv: t.adv + r.adv }), { box: 0, bank: 0, adv: 0 })
