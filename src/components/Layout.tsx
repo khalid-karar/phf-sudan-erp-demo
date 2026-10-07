@@ -108,10 +108,10 @@ function Sidebar({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed
     <nav className="flex h-full flex-col bg-nile text-white" aria-label={lang === 'ar' ? 'القائمة الرئيسية' : 'Main menu'}>
       <div className={`flex items-center gap-3 pt-5 pb-4 ${collapsed ? 'justify-center px-2' : 'px-5'}`}>
         {collapsed ? (
-          <img src={org.logo} alt={org.name[lang]} className="size-10 shrink-0 rounded-md bg-white object-cover object-left" />
+          <img src={org.logo.replace('phf-logo', 'phf-mark')} alt={org.name[lang]} className="size-10 shrink-0 rounded-md bg-white object-contain p-0.5" />
         ) : (
           <div className="min-w-0 flex-1 rounded-lg bg-white px-2 py-1.5">
-            <img src={org.logo} alt={org.name[lang]} className="mx-auto h-11 w-auto max-w-full object-contain" />
+            <img src={org.logo} alt={org.name[lang]} className="mx-auto h-24 w-auto max-w-full object-contain" />
             <div className="mt-0.5 text-center text-[10.5px] font-medium text-nile">{lang === 'ar' ? 'السودان' : 'Sudan'}</div>
           </div>
         )}

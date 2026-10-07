@@ -31,7 +31,7 @@ export function Login() {
     <div className="grid min-h-screen lg:grid-cols-[1fr_1.1fr]" dir={ar ? 'rtl' : 'ltr'}>
       <div className="flex flex-col justify-between bg-nile p-8 text-white lg:p-12">
         <div className="flex items-center gap-3">
-          <img src={org.logo} alt="" className="h-14 w-auto rounded-lg bg-white p-1.5 object-contain" />
+          <img src={org.logo} alt="" className="h-24 w-auto rounded-lg bg-white p-2 object-contain" />
           <div className="leading-tight">
             <div className="font-kufi text-[17px] font-semibold">{org.shortName[lang]}</div>
             <div className="text-[13px] text-white/65">{org.name[lang]}</div>

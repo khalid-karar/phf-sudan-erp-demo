@@ -140,7 +140,7 @@ export function DonorReport() {
           <div dir={L === 'ar' ? 'rtl' : 'ltr'} style={{ width: PAGE_W }} className="bg-white font-plex text-[12.5px] leading-relaxed">
             <Block className="pt-8">
               <div className="flex items-center gap-3">
-                <img src={s.org.logo} alt="" className="size-14 rounded-full object-cover" />
+                <img src={s.org.logo} alt="" className="h-14 w-auto object-contain" />
                 <div className="leading-tight">
                   <div className="font-kufi text-[14px] font-bold text-nile">{s.org.name[L]}</div>
                   <div className="text-[11px] text-muted">{p.donor[L]}</div>
