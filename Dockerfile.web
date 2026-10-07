@@ -1,0 +1,14 @@
+# The web app and HTTPS in one image: builds the React app in live mode and serves it with Caddy.
+# /api/* goes to the API container; everything else is the app (hash routing, so one index.html).
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
+
+FROM caddy:2-alpine
+COPY --from=build /app/dist /srv
+COPY server/Caddyfile /etc/caddy/Caddyfile

@@ -32,12 +32,12 @@ All seeded demo users sign in with the password `Phf-Demo-2026` (change it with 
 
 ## Deploy on the Saudi server
 
-The server needs Docker, and a domain name (e.g. `api.erp.phfsudan.org`) whose DNS points at it.
+The server needs Docker, and a domain name (e.g. `erp.phfsudan.org`) whose DNS points at it. The same address serves the web app and the API.
 
 ```bash
 git clone https://github.com/khalid-karar/phf-sudan-erp-demo.git && cd phf-sudan-erp-demo/server
-cp .env.example .env              # set DB_PASSWORD, JWT_SECRET, API_DOMAIN, CORS_ORIGINS, BOOTSTRAP_ADMIN_EMAIL
-docker compose up -d --build      # API + PostgreSQL + nightly backups + HTTPS (Caddy)
+cp .env.example .env              # set DB_PASSWORD, JWT_SECRET, APP_DOMAIN, BOOTSTRAP_ADMIN_EMAIL
+docker compose up -d --build      # web app + API + PostgreSQL + nightly backups + HTTPS (Caddy)
 docker compose exec api node dist/db/bootstrap.js
 ```
 
@@ -347,6 +347,5 @@ Errors look like `{ code, message: { ar, en }, details? }`, so the app can show 
 
 These follow the same patterns as the modules above:
 - sending the HQ report automatically on a set day (needs a server-side PDF)
-- connecting the React app to this API in place of its in-browser data
 
 The system accounts the ledger needs for stock and payroll (`inventory`, `inkind_revenue`, `salaries`, `payroll_deductions`) are already configured.

@@ -1,0 +1,17 @@
+# One domain for the app and the API. Certificates are obtained automatically; point the domain's DNS at this server first.
+{$APP_DOMAIN} {
+	encode gzip zstd
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /health {
+		reverse_proxy api:3000
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+		header /assets/* Cache-Control "public, max-age=31536000, immutable"
+	}
+}

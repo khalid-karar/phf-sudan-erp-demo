@@ -1,7 +1,7 @@
 # PHF Sudan — Resource Management System (demo)
 
 Clickable frontend demo of an ERP for the Kuwait Patients Helping Fund (Sudan): HQ in Khartoum plus 11 offices.
-Everything runs in the browser on sample data; there is no backend yet. **Reset demo** in the top bar restores the starting data.
+By default everything runs in the browser on sample data (**Reset demo** in the top bar restores the starting data). Built with `VITE_API_URL` set, the same app runs in **live mode**: sign-in, and every screen reads and writes the API in `server/`.
 
 ## Run
 
@@ -9,6 +9,9 @@ Everything runs in the browser on sample data; there is no backend yet. **Reset 
 npm install
 npm run dev      # http://localhost:5173
 npm run build    # static site in dist/ (Netlify uses netlify.toml)
+
+# live mode against a local API (see server/README.md)
+VITE_API_URL=http://localhost:3000 npm run dev
 ```
 
 ## Modules
@@ -47,11 +50,9 @@ Use the user menu (top corner) to switch between demo users. **Reset demo** in t
 11. **Reports → Monthly HQ report** as the Finance Manager: pick last month, edit the summary, **Download PDF**, then **Send by email** (recipients and wording from *Settings → Report delivery*). The send appears in **Sent reports**.
 12. **Alerts & deadlines**: the bell, the calendar, and *Settings → Notification rules* (e.g. “5 days before the HQ report is due, notify the accountant by email and WhatsApp”).
 
-## Still to build (backend phase)
+## Going live
 
-- Real sign-in, server-side permissions and audit log
-- Database and API hosted on the Saudi server; real email/WhatsApp/SMS delivery
-- Mobile offline sync against the server; attachments storage
+The API, database, backups and HTTPS deploy with `docker compose` on the Saudi server, which also builds and serves this app in live mode (steps in `server/README.md`). Still to do: automatic sending of the monthly report on a set day.
 
 ## Notes
 
