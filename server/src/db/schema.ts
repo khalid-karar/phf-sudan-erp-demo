@@ -939,3 +939,26 @@ export const sentReports = pgTable(
   },
   (t) => [index('sent_reports_period_idx').on(t.kind, t.period)],
 )
+
+// ─── Procurement (the purchase document cycle) ───────────────────────────────
+// One case carries a purchase from requisition (PR) through price request (RFQ), bids and technical evaluation,
+// award, purchase order (PO) and stores receipt. Each stage's form content lives in `data`.
+
+export const procurementStatus = pgEnum('procurement_status', ['draft', 'rfq', 'evaluated', 'ordered', 'received', 'cancelled'])
+
+export const procurementCases = pgTable(
+  'procurement_cases',
+  {
+    id: id(),
+    no: text('no').notNull().unique(),
+    officeId: text('office_id').notNull().references(() => offices.id),
+    projectId: text('project_id').references(() => projects.id),
+    lineId: text('line_id').references(() => budgetLines.id),
+    status: procurementStatus('status').notNull().default('draft'),
+    data: jsonb('data').notNull(),
+    createdById: text('created_by_id').references(() => users.id),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [index('procurement_office_status').on(t.officeId, t.status)],
+)
