@@ -302,8 +302,8 @@ function DeadlineModal({ d: init, onClose }: { d: Deadline; onClose: () => void 
           </Button>
           <Button
             disabled={!valid}
-            onClick={() => {
-              s.saveDeadline({ ...d, id: d.id || `d-${Date.now().toString(36)}`, title: { ar: d.title.ar || d.title.en, en: d.title.en || d.title.ar } })
+            onClick={async () => {
+              if ((await s.saveDeadline({ ...d, id: d.id || `d-${Date.now().toString(36)}`, title: { ar: d.title.ar || d.title.en, en: d.title.en || d.title.ar } })) === false) return
               onClose()
             }}
           >

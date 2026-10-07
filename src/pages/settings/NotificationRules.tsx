@@ -298,8 +298,8 @@ function RuleModal({ rule, onClose }: { rule: NotifRule; onClose: () => void }) 
           </Button>
           <Button
             disabled={!r.channels.inapp && !chans.some((c) => r.channels[c])}
-            onClick={() => {
-              s.saveNotifRule({ ...r, id: r.id || `n-${Date.now().toString(36)}` })
+            onClick={async () => {
+              if ((await s.saveNotifRule({ ...r, id: r.id || `n-${Date.now().toString(36)}` })) === false) return
               onClose()
             }}
           >

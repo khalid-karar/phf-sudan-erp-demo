@@ -139,15 +139,15 @@ interface State {
   channels: ChannelConfig
 
   runNotifications: () => void
-  saveNotifRule: (r: NotifRule) => void
-  deleteNotifRule: (id: string) => void
+  saveNotifRule: (r: NotifRule) => void | Promise<boolean>
+  deleteNotifRule: (id: string) => void | Promise<boolean>
   markRead: (id: string) => void
   markAllRead: () => void
   unreadCount: (userId: string) => number
-  setChannels: (patch: Partial<ChannelConfig>) => void
-  runChannelTest: (ch: Channel, to: string, draft?: ChannelConfig) => ChannelConfig[Channel]['lastTest']
-  saveDeadline: (d: Deadline) => void
-  deleteDeadline: (id: string) => void
+  setChannels: (patch: Partial<ChannelConfig>) => void | Promise<boolean>
+  runChannelTest: (ch: Channel, to: string, draft?: ChannelConfig) => ChannelConfig[Channel]['lastTest'] | Promise<ChannelConfig[Channel]['lastTest']>
+  saveDeadline: (d: Deadline) => void | Promise<boolean>
+  deleteDeadline: (id: string) => void | Promise<boolean>
 
   activities: FieldActivity[]
   outbox: OutboxItem[]
@@ -452,7 +452,9 @@ export const useStore = create<State>()(
     set({ notifRules: exists ? s.notifRules.map((x) => (x.id === r.id ? r : x)) : [...s.notifRules, r] })
     get().toast({ ar: 'حُفظت قاعدة التنبيه', en: 'Notification rule saved' })
   },
-  deleteNotifRule: (id) => set((s) => ({ notifRules: s.notifRules.filter((r) => r.id !== id) })),
+  deleteNotifRule: (id) => {
+    set((s) => ({ notifRules: s.notifRules.filter((r) => r.id !== id) }))
+  },
   markRead: (id) => set((s) => ({ notifications: s.notifications.map((n) => (n.id === id && !n.readBy.includes(s.userId) ? { ...n, readBy: [...n.readBy, s.userId] } : n)) })),
   markAllRead: () => set((s) => ({ notifications: s.notifications.map((n) => (n.userIds.includes(s.userId) && !n.readBy.includes(s.userId) ? { ...n, readBy: [...n.readBy, s.userId] } : n)) })),
   unreadCount: (userId) => get().notifications.filter((n) => n.userIds.includes(userId) && !n.readBy.includes(userId)).length,
@@ -479,7 +481,9 @@ export const useStore = create<State>()(
     set({ deadlines: exists ? s.deadlines.map((x) => (x.id === d.id ? d : x)) : [...s.deadlines, d] })
     get().toast(exists ? { ar: 'حُفظ الموعد', en: 'Deadline saved' } : { ar: 'أُضيف الموعد وسيُنبَّه المسؤول قبله', en: 'Deadline added; its owner will be reminded beforehand' })
   },
-  deleteDeadline: (id) => set((s) => ({ deadlines: s.deadlines.filter((d) => d.id !== id) })),
+  deleteDeadline: (id) => {
+    set((s) => ({ deadlines: s.deadlines.filter((d) => d.id !== id) }))
+  },
 
   saveActivity: (a) => {
     const s = get()

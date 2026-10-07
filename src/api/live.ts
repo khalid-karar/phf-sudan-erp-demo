@@ -1,6 +1,7 @@
 // Live mode runtime: loads data into the store, refreshes it after a change, and turns failures into messages.
 import { useStore } from '../lib/store'
-import { ApiError, logout as apiLogout } from './http'
+import { api, ApiError, logout as apiLogout } from './http'
+import { mapInbox } from './map'
 import { liveActions } from './actions'
 import { loadCore, loadData } from './load'
 
@@ -22,6 +23,13 @@ export async function refreshData() {
   const role = st.roles.find((r) => r.id === st.users.find((u) => u.id === st.userId)?.role)
   const data = await loadData(st.userId, role?.permissions ?? {})
   useStore.setState(clean(data) as never)
+}
+
+/** The bell: new alerts from the server's engine show up within a minute without reloading everything. */
+export async function refreshInbox() {
+  const st = useStore.getState()
+  const rows = await api.get<import('./dto').InboxDto[]>('/notifications?limit=100')
+  useStore.setState({ notifications: rows.map((x) => mapInbox(x, st.userId)) } as never)
 }
 
 export async function refreshCore() {

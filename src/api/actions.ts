@@ -1,5 +1,5 @@
 // The store's write actions in live mode: each one asks the server, and the screen then shows what the server holds.
-import type { Beneficiary, Service, ServiceType, Employee, LeaveRequest, Item, ShipmentLine, Vehicle, FuelLog, Account, PayMethod, SettlementItem, FieldActivity, FieldReport, ApprovalRule, ControlMode, Office, OrgSettings, Reallocation, Role, SpendRequest, User } from '../data/types'
+import type { ChannelConfig, Channel, Deadline, NotifRule, Beneficiary, Service, ServiceType, Employee, LeaveRequest, Item, ShipmentLine, Vehicle, FuelLog, Account, PayMethod, SettlementItem, FieldActivity, FieldReport, ApprovalRule, ControlMode, Office, OrgSettings, Reallocation, Role, SpendRequest, User } from '../data/types'
 import { useStore } from '../lib/store'
 import { ApiError, api } from './http'
 import { act, errorText, refreshData } from './live'
@@ -298,6 +298,60 @@ Object.assign(liveActions, {
     const ok = await act(() => api.post(`/patients/${id}/services`, { type: sv.type, date: sv.date.slice(0, 10), activityId: sv.activityId, note: sv.note }), { ok: { ar: 'سُجّلت الخدمة', en: 'Service recorded' } })
     if (ok) touchPatients()
     return ok
+  },
+})
+
+Object.assign(liveActions, {
+  saveNotifRule: (r: NotifRule) => {
+    const exists = useStore.getState().notifRules.some((x) => x.id === r.id)
+    const body = { event: r.event, nameAr: r.name.ar, nameEn: r.name.en, threshold: r.threshold ?? null, recipients: r.recipients, channels: { inapp: r.channels.inapp, email: r.channels.email, whatsapp: r.channels.whatsapp, sms: r.channels.sms }, enabled: r.enabled }
+    return act(() => (exists ? api.patch(`/notification-rules/${r.id}`, body) : api.post('/notification-rules', body)), { ok: { ar: 'حُفظت قاعدة التنبيه', en: 'Notification rule saved' } })
+  },
+  deleteNotifRule: (id: string) => act(() => api.del(`/notification-rules/${id}`), { ok: { ar: 'حُذفت القاعدة', en: 'Rule deleted' } }),
+
+  markRead: (id: string) => {
+    const me = useStore.getState().userId
+    useStore.setState((s) => ({ notifications: s.notifications.map((n) => (n.id === id && !n.readBy.includes(me) ? { ...n, readBy: [...n.readBy, me] } : n)) }))
+    void api.post(`/notifications/${id}/read`, {}).catch(() => undefined)
+  },
+  markAllRead: () => {
+    const me = useStore.getState().userId
+    useStore.setState((s) => ({ notifications: s.notifications.map((n) => (n.readBy.includes(me) ? n : { ...n, readBy: [...n.readBy, me] })) }))
+    void api.post('/notifications/read-all', {}).catch(() => undefined)
+  },
+
+  saveDeadline: (d: Deadline) => {
+    const exists = useStore.getState().deadlines.some((x) => x.id === d.id)
+    const body = { titleAr: d.title.ar, titleEn: d.title.en, projectId: d.projectId ?? null, due: d.due.slice(0, 10), notifyDaysBefore: d.notifyDaysBefore, ownerRoleId: d.owner, recurrence: d.recurrence ?? 'none' }
+    return act(
+      () => (!exists ? api.post('/deadlines', body) : d.done ? api.post(`/deadlines/${d.id}/done`, {}) : api.patch(`/deadlines/${d.id}`, body)),
+      { ok: exists ? { ar: 'حُفظ الموعد', en: 'Deadline saved' } : { ar: 'أُضيف الموعد وسيُنبَّه المسؤول قبله', en: 'Deadline added; its owner will be reminded before it' } },
+    )
+  },
+  deleteDeadline: (id: string) => act(() => api.del(`/deadlines/${id}`), { ok: { ar: 'حُذف الموعد', en: 'Deadline deleted' } }),
+
+  setChannels: (patch: Partial<ChannelConfig>) => {
+    const cur = useStore.getState().channels
+    return act(async () => {
+      for (const ch of Object.keys(patch) as Channel[]) {
+        const c = { ...(patch[ch] as unknown as Record<string, unknown>) }
+        delete c.lastTest
+        if (JSON.stringify(c) !== JSON.stringify({ ...(cur[ch] as unknown as Record<string, unknown>), lastTest: undefined })) await api.put(`/channels/${ch}`, c)
+      }
+    }, { core: false })
+  },
+  runChannelTest: async (ch: Channel, to: string, draft?: ChannelConfig) => {
+    const cfg = { ...((draft ?? useStore.getState().channels)[ch] as unknown as Record<string, unknown>) }
+    delete cfg.lastTest
+    try {
+      const r = await api.post<{ ok: boolean; message: { ar: string; en: string } }>(`/channels/${ch}/test`, { to, config: cfg })
+      useStore.getState().toast(r.message, r.ok ? 'ok' : 'bad')
+      return { at: new Date().toISOString(), ok: r.ok, message: r.message }
+    } catch (e) {
+      const m = errorText(e)
+      useStore.getState().toast(m, 'bad')
+      return { at: new Date().toISOString(), ok: false, message: m }
+    }
   },
 })
 

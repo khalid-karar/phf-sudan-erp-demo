@@ -151,13 +151,13 @@ export function Channels() {
   const [to, setTo] = useState<Record<Channel, string>>({ email: me.email ?? '', whatsapp: me.phone ?? '', sms: me.phone ?? '' })
   const strip = (c: ChannelConfig) => JSON.stringify({ ...c, email: { ...c.email, lastTest: 0 }, whatsapp: { ...c.whatsapp, lastTest: 0 }, sms: { ...c.sms, lastTest: 0 } })
   const dirty = strip(d) !== strip(s.channels)
-  const save = () => {
-    s.setChannels(structuredClone(d))
+  const save = async () => {
+    if ((await s.setChannels(structuredClone(d))) === false) return
     s.toast({ ar: 'حُفظت إعدادات القنوات', en: 'Channel settings saved' })
   }
   // Tests the settings as typed (saved or not); the result is kept with the channel.
-  const test = (ch: Channel) => {
-    const lastTest = s.runChannelTest(ch, to[ch], d)
+  const test = async (ch: Channel) => {
+    const lastTest = await s.runChannelTest(ch, to[ch], d)
     setD((x) => ({ ...x, [ch]: { ...x[ch], lastTest } }))
   }
   const E = d.email
