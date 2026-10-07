@@ -329,9 +329,9 @@ function EmployeeModal({ emp, onClose }: { emp: Employee; onClose: () => void })
         </Button>
         <Button
           disabled={!valid}
-          onClick={() => {
+          onClick={async () => {
             const n = s.employees.length + 101
-            s.saveEmployee({ ...d, id: d.id || `e-${Date.now().toString(36)}`, no: d.no || `EMP-${String(n).padStart(4, '0')}`, name: { ar: d.name.ar || d.name.en, en: d.name.en || d.name.ar } })
+            if ((await s.saveEmployee({ ...d, id: d.id || `e-${Date.now().toString(36)}`, no: d.no || `EMP-${String(n).padStart(4, '0')}`, name: { ar: d.name.ar || d.name.en, en: d.name.en || d.name.ar } })) === false) return
             onClose()
           }}
         >
@@ -497,8 +497,8 @@ function LeaveModal({ defaultEmp, onClose }: { defaultEmp?: string; onClose: () 
         </Button>
         <Button
           disabled={+new Date(d.to) < +new Date(d.from)}
-          onClick={() => {
-            s.requestLeave({ ...d, days })
+          onClick={async () => {
+            if ((await s.requestLeave({ ...d, days })) === false) return
             onClose()
           }}
         >

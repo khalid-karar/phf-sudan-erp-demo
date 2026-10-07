@@ -24,6 +24,7 @@ import type {
   LeaveRequest,
   PayrollRun,
   Service,
+  ServiceType,
   Item,
   Shipment,
   ShipmentLine,
@@ -84,6 +85,7 @@ interface State {
   lang: Lang
   userId: string
   serverUsage?: Record<string, import('./budget').Usage> | null
+  patientsVersion?: number
   org: OrgSettings
   offices: Office[]
   users: User[]
@@ -101,12 +103,12 @@ interface State {
   leaves: LeaveRequest[]
   payrolls: PayrollRun[]
   beneficiaries: Beneficiary[]
-  saveEmployee: (e: Employee) => void
-  requestLeave: (l: Omit<LeaveRequest, 'id' | 'status' | 'createdAt'>) => void
-  decideLeave: (id: string, approve: boolean) => void
-  postPayroll: (period: string) => void
-  saveBeneficiary: (b: Beneficiary) => void
-  addService: (beneficiaryId: string, sv: Omit<Service, 'id'>) => void
+  saveEmployee: (e: Employee) => void | Promise<boolean>
+  requestLeave: (l: Omit<LeaveRequest, 'id' | 'status' | 'createdAt'>) => void | Promise<boolean>
+  decideLeave: (id: string, approve: boolean) => void | Promise<boolean>
+  postPayroll: (period: string) => void | Promise<boolean>
+  saveBeneficiary: (b: Beneficiary, opts?: { firstService?: ServiceType; notDuplicate?: boolean }) => void | Promise<boolean>
+  addService: (beneficiaryId: string, sv: Omit<Service, 'id'>) => void | Promise<boolean>
 
   items: Item[]
   stock: StockLevel[]
@@ -742,7 +744,8 @@ export const useStore = create<State>()(
     void gross
     get().toast({ ar: `رُحّلت رواتب ${period} — القيد ${je.no}، وحُمّلت حصص المشاريع على بنودها`, en: `Payroll ${period} posted — entry ${je.no}; project shares charged to their lines` })
   },
-  saveBeneficiary: (b) => {
+  saveBeneficiary: (b, _opts) => {
+    void _opts
     const s = get()
     const exists = s.beneficiaries.some((x) => x.id === b.id)
     set({ beneficiaries: exists ? s.beneficiaries.map((x) => (x.id === b.id ? b : x)) : [b, ...s.beneficiaries] })

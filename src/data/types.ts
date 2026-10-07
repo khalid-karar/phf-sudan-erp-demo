@@ -618,4 +618,7 @@ export interface Beneficiary {
   registeredAt: string
   registeredBy?: string
   services: Service[]
+  /** Live mode: the register list carries only a count and the latest service; the full history is opened on demand. */
+  serviceCount?: number
+  lastService?: { type: ServiceType; date: string }
 }

@@ -41,50 +41,52 @@ export interface Core {
 
 /** Sign-in details, organisation, offices, roles and the people directory. Needed before anything can be shown. */
 export async function loadCore(prevOrg: Parameters<typeof M.mapOrg>[1]): Promise<Core & { me: T.MeDto }> {
-  const [me, org, offices, roles, dir, full] = await Promise.all([
-    api.get<T.MeDto>('/auth/me'),
+  const me = await api.get<T.MeDto>('/auth/me')
+  const [org, offices, roles, dir, full] = await Promise.all([
     api.get<T.OrgDto>('/org/settings'),
     api.get<T.OfficeDto[]>('/offices'),
     api.get<T.RoleDto[]>('/roles'),
     api.get<T.UserDto[]>('/users/directory'),
-    soft<T.UserDto[]>('/users', []), // settings managers also get phone numbers
+    me.role.permissions.settings === 'manage' ? soft<T.UserDto[]>('/users', []) : Promise.resolve([] as T.UserDto[]), // settings managers also get phone numbers
   ])
   const phones = new Map(full.map((u) => [u.id, u.phone]))
   return { me, org: M.mapOrg(org, prevOrg), offices: offices.map(M.mapOffice), roles: roles.map(M.mapRole), users: dir.map((u) => M.mapUser({ ...u, phone: phones.get(u.id) })) }
 }
 
 /** Everything the screens read, as the store's data. */
-export async function loadData(userId: string) {
+export async function loadData(userId: string, perms: Record<string, string>) {
+  // A module the role cannot open is not even asked for: nothing to load, and no refused requests.
+  const g = <X>(m: string, path: string, fallback: X) => ((perms[m] ?? 'none') === 'none' ? Promise.resolve(fallback) : soft<X>(path, fallback))
   const [trees, expenses, requests, reallocations, rules, activities, accounts, jr, vouchers, advances, rates, close, items, stock, moves, shipments, vehicles, employees, leave, payrolls, deadlines, notifRules, inbox, deliveries, channels, reportSettings, sent] = await Promise.all([
-    soft<T.ProjectDto[]>('/projects/tree', []),
-    soft<T.ExpenseDto[]>('/projects/expenses', []),
-    soft<T.RequestDto[]>('/requests?limit=500', []),
-    soft<T.ReallocationDto[]>('/reallocations', []),
-    soft<{ rules: T.RuleDto[] }>('/approval-rules', { rules: [] }),
-    soft<T.ActivityDto[]>('/activities?limit=500', []),
-    soft<{ accounts: T.AccountDto[]; systemAccounts: Record<string, string> }>('/finance/accounts', { accounts: [], systemAccounts: {} }),
-    journal(),
-    soft<T.VoucherDto[]>('/finance/vouchers?limit=500', []),
-    soft<T.AdvanceDto[]>('/finance/advances', []),
+    g<T.ProjectDto[]>('projects', '/projects/tree', []),
+    g<T.ExpenseDto[]>('projects', '/projects/expenses', []),
+    g<T.RequestDto[]>('projects', '/requests?limit=500', []),
+    g<T.ReallocationDto[]>('projects', '/reallocations', []),
+    g<{ rules: T.RuleDto[] }>('projects', '/approval-rules', { rules: [] }),
+    g<T.ActivityDto[]>('activities', '/activities?limit=500', []),
+    g<{ accounts: T.AccountDto[]; systemAccounts: Record<string, string> }>('finance', '/finance/accounts', { accounts: [], systemAccounts: {} }),
+    (perms.finance ?? 'none') === 'none' ? Promise.resolve([] as T.JournalDto[]) : journal(),
+    g<T.VoucherDto[]>('finance', '/finance/vouchers?limit=500', []),
+    g<T.AdvanceDto[]>('finance', '/finance/advances', []),
     soft<T.RateDto[]>('/finance/rates', []),
-    soft<T.CloseRowDto[]>(`/finance/close/${thisClosingPeriod()}`, []),
-    soft<T.ItemDto[]>('/supply/items', []),
-    soft<T.StockDto[]>('/supply/stock', []),
-    soft<T.MoveDto[]>('/supply/moves?limit=500', []),
-    soft<T.ShipmentDto[]>('/supply/shipments', []),
-    soft<T.VehicleDto[]>('/logistics/vehicles', []),
-    soft<T.EmployeeDto[]>('/hr/employees', []),
+    g<T.CloseRowDto[]>('finance', `/finance/close/${thisClosingPeriod()}`, []),
+    g<T.ItemDto[]>('supply', '/supply/items', []),
+    g<T.StockDto[]>('supply', '/supply/stock', []),
+    g<T.MoveDto[]>('supply', '/supply/moves?limit=500', []),
+    g<T.ShipmentDto[]>('supply', '/supply/shipments', []),
+    g<T.VehicleDto[]>('logistics', '/logistics/vehicles', []),
+    g<T.EmployeeDto[]>('hr', '/hr/employees', []),
     soft<T.LeaveDto[]>('/hr/leave', []),
-    soft<T.PayrollDto[]>('/hr/payroll', []),
-    soft<T.DeadlineDto[]>('/deadlines', []),
-    soft<T.NotifRuleDto[]>('/notification-rules', []),
+    g<T.PayrollDto[]>('hr', '/hr/payroll', []),
+    g<T.DeadlineDto[]>('alerts', '/deadlines', []),
+    g<T.NotifRuleDto[]>('alerts', '/notification-rules', []),
     soft<T.InboxDto[]>('/notifications?limit=100', []),
-    soft<T.DeliveryDto[]>('/deliveries?limit=200', []),
-    soft<Record<string, unknown> | null>('/channels', null),
-    soft<{ hq: ReportSettings['hq']; donor: ReportSettings['donor'] } | null>('/report-settings', null),
-    soft<(T.SentReportDto & { sentByEn?: string | null })[]>('/reports/sent?limit=200', []),
+    g<T.DeliveryDto[]>('settings', '/deliveries?limit=200', []),
+    g<Record<string, unknown> | null>('settings', '/channels', null),
+    g<{ hq: ReportSettings['hq']; donor: ReportSettings['donor'] } | null>('reports', '/report-settings', null),
+    g<(T.SentReportDto & { sentByEn?: string | null })[]>('reports', '/reports/sent?limit=200', []),
   ])
-  const vehicleDetails = await Promise.all(vehicles.map((v) => soft<{ fuel?: T.FuelDto[] }>(`/logistics/vehicles/${v.id}`, {})))
+  const vehicleDetails = await Promise.all(vehicles.map((v) => g<{ fuel?: T.FuelDto[] }>('logistics', `/logistics/vehicles/${v.id}`, {})))
   const actCode = new Map(activities.map((a) => [a.id, a.code]))
   const lineMap: Record<string, string> = {}
   for (const p of trees) for (const pl of p.pillars) for (const l of pl.lines) if (l.expenseAccountCode) lineMap[l.id] = l.expenseAccountCode

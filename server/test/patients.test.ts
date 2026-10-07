@@ -127,3 +127,16 @@ describe('stats', () => {
     expect(s.byOffice.every((o: { officeId: string }) => o.officeId === 'ksl')).toBe(true)
   })
 })
+
+describe('what the register screen needs', () => {
+  it('shows the type of each person’s last service in the list', async () => {
+    const items = (await fo.get('/patients?limit=50')).body.items as { services: number; lastServiceType: string | null }[]
+    for (const i of items) expect(i.services > 0 ? !!i.lastServiceType : i.lastServiceType === null).toBe(true)
+  })
+  it('breaks the statistics down by age and by month of registration', async () => {
+    const s = (await admin.get('/patients/stats')).body
+    expect(s.ages.under5 + s.ages.a5_14 + s.ages.a15_49 + s.ages.over50).toBe(s.registered)
+    expect(s.registeredByMonth.reduce((n: number, m: { n: number }) => n + m.n, 0)).toBe(s.registered)
+    expect(s.registeredByOffice.reduce((n: number, m: { n: number }) => n + m.n, 0)).toBe(s.registered)
+  })
+})

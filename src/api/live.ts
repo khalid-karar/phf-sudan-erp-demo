@@ -10,7 +10,7 @@ const clean = (o: Patch) => Object.fromEntries(Object.entries(o).filter(([, v]) 
 /** After sign-in: who this is, the organisation, and all the data their role can see. */
 export async function bootstrapLive() {
   const { me, ...core } = await loadCore(useStore.getState().org)
-  const data = await loadData(me.id)
+  const data = await loadData(me.id, me.role.permissions)
   // The signed-in person's own role is in /auth/me even if the roles list is short.
   useStore.setState({ ...core, ...clean(data), userId: me.id } as never)
   return me
@@ -18,8 +18,9 @@ export async function bootstrapLive() {
 
 /** Re-reads the data after something changed (every write does this, so the screen always shows what the server holds). */
 export async function refreshData() {
-  const id = useStore.getState().userId
-  const data = await loadData(id)
+  const st = useStore.getState()
+  const role = st.roles.find((r) => r.id === st.users.find((u) => u.id === st.userId)?.role)
+  const data = await loadData(st.userId, role?.permissions ?? {})
   useStore.setState(clean(data) as never)
 }
 

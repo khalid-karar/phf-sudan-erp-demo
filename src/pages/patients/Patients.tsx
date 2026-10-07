@@ -1,6 +1,8 @@
 import { AlertTriangle, HeartPulse, Plus, Search, UserPlus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { LIVE } from '../../api/http'
+import { fetchDuplicates, fetchPatient, usePatientPage, usePatientStats } from '../../api/patients'
 import { initialsOf } from '../../components/Layout'
 import { Button, Field, inputCls, Modal, PageHeader, Panel } from '../../components/ui'
 import { serviceName } from '../../data/people'
@@ -50,8 +52,10 @@ export function Beneficiaries() {
   const [reg, setReg] = useState<Beneficiary | null>(null)
   const canEdit = can('patients', 'edit')
 
-  const scoped = s.beneficiaries.filter((b) => !scopeOffice || b.officeId === scopeOffice)
-  const list = scoped.filter(
+  const page = usePatientPage({ q, office, gender, svc }, LIVE)
+  const stats = usePatientStats(office || scopeOffice || '', LIVE)
+  const scoped = LIVE ? [] : s.beneficiaries.filter((b) => !scopeOffice || b.officeId === scopeOffice)
+  const list = LIVE ? page.items : scoped.filter(
     (b) =>
       (!office || b.officeId === office) &&
       (!gender || b.gender === gender) &&
@@ -59,7 +63,10 @@ export function Beneficiaries() {
       (!q || b.name.ar.includes(q) || b.name.en.toLowerCase().includes(q.toLowerCase()) || b.no.toLowerCase().includes(q.toLowerCase()) || (b.phone ?? '').replace(/\D/g, '').includes(q.replace(/\D/g, '') || '§')),
   )
   const month = new Date().toISOString().slice(0, 7)
-  const servicesThisMonth = scoped.reduce((n, b) => n + b.services.filter((x) => x.date.slice(0, 7) === month).length, 0)
+  const servicesThisMonth = LIVE ? (stats?.byMonth.find((m) => m.month === month)?.n ?? 0) : scoped.reduce((n, b) => n + b.services.filter((x) => x.date.slice(0, 7) === month).length, 0)
+  const registered = LIVE ? (stats?.registered ?? 0) : scoped.length
+  const displaced = LIVE ? (stats?.displaced ?? 0) : scoped.filter((b) => b.displaced).length
+  const under15 = LIVE ? (stats ? stats.ages.under5 + stats.ages.a5_14 : 0) : scoped.filter((b) => ageOf(b) < 15).length
 
   const blank = (): Beneficiary => ({
     id: '',
@@ -95,10 +102,10 @@ export function Beneficiaries() {
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {(
           [
-            [ar ? 'مستفيدون مسجّلون' : 'Registered beneficiaries', scoped.length],
+            [ar ? 'مستفيدون مسجّلون' : 'Registered beneficiaries', registered],
             [ar ? 'خدمات هذا الشهر' : 'Services this month', servicesThisMonth],
-            [ar ? 'نازحون' : 'Displaced', scoped.filter((b) => b.displaced).length],
-            [ar ? 'أطفال دون 15' : 'Children under 15', scoped.filter((b) => ageOf(b) < 15).length],
+            [ar ? 'نازحون' : 'Displaced', displaced],
+            [ar ? 'أطفال دون 15' : 'Children under 15', under15],
           ] as [string, number][]
         ).map(([k, v]) => (
           <div key={k} className="rounded-lg border border-line bg-surface p-4">
@@ -150,8 +157,8 @@ export function Beneficiaries() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {list.slice(0, 200).map((b) => {
-                const last = [...b.services].sort((x, y) => y.date.localeCompare(x.date))[0]
+              {list.slice(0, LIVE ? list.length : 200).map((b) => {
+                const last = b.lastService ?? [...b.services].sort((x, y) => y.date.localeCompare(x.date))[0]
                 return (
                   <tr key={b.id} className="cursor-pointer hover:bg-paper" onClick={() => setOpen(b)}>
                     <td className="px-5 py-2.5">
@@ -181,12 +188,12 @@ export function Beneficiaries() {
                         <span className="text-muted">—</span>
                       )}
                     </td>
-                    <td className="num py-2.5 pe-3 text-end">{b.services.length}</td>
+                    <td className="num py-2.5 pe-3 text-end">{b.serviceCount ?? b.services.length}</td>
                     <td className="px-5 py-2.5 text-end text-[13px] text-nile">{ar ? 'فتح الملف' : 'Open file'}</td>
                   </tr>
                 )
               })}
-              {list.length === 0 && (
+              {list.length === 0 && !page.loading && (
                 <tr>
                   <td colSpan={6} className="px-5 py-10 text-center text-muted">
                     {ar ? 'لا يوجد مستفيدون يطابقون البحث.' : 'No beneficiaries match your search.'}
@@ -197,7 +204,18 @@ export function Beneficiaries() {
           </table>
         </div>
         <div className="border-t border-line px-5 py-2.5 text-[12.5px] text-muted">
-          {ar ? `يظهر ${num(Math.min(list.length, 200))} من ${num(list.length)}` : `Showing ${num(Math.min(list.length, 200))} of ${num(list.length)}`}
+          {LIVE
+            ? ar
+              ? `يظهر ${num(list.length)} من ${num(page.total)}`
+              : `Showing ${num(list.length)} of ${num(page.total)}`
+            : ar
+              ? `يظهر ${num(Math.min(list.length, 200))} من ${num(list.length)}`
+              : `Showing ${num(Math.min(list.length, 200))} of ${num(list.length)}`}
+          {LIVE && page.hasMore && (
+            <button className="ms-3 font-medium text-nile underline disabled:opacity-50" disabled={page.loading} onClick={() => void page.more()}>
+              {ar ? 'عرض المزيد' : 'Show more'}
+            </button>
+          )}
           {' · '}
           {ar ? 'أرقام الهواتف تظهر فقط لمن لديه صلاحية التعديل على السجل.' : 'Phone numbers are only shown to roles that can edit the register.'}
         </div>
@@ -216,6 +234,17 @@ function BeneficiaryFile({ b, onClose, onEdit }: { b: Beneficiary; onClose: () =
   const canEdit = can('patients', 'edit')
   const [adding, setAdding] = useState(false)
   const [sv, setSv] = useState<{ type: ServiceType; date: string; activityId: string; note: string }>({ type: 'consultation', date: new Date().toISOString().slice(0, 10), activityId: '', note: '' })
+  const version = useStore((x) => x.patientsVersion ?? 0)
+  const [full, setFull] = useState<Beneficiary | null>(null)
+  useEffect(() => {
+    if (!LIVE) return
+    let on = true
+    fetchPatient(b.id).then((r) => on && setFull(r)).catch(() => undefined)
+    return () => {
+      on = false
+    }
+  }, [b.id, version])
+  b = full ?? b
   const acts = s.activities.filter((a) => a.officeId === b.officeId).sort((x, y) => y.date.localeCompare(x.date))
   const services = [...b.services].sort((x, y) => y.date.localeCompare(x.date))
   return (
@@ -277,8 +306,8 @@ function BeneficiaryFile({ b, onClose, onEdit }: { b: Beneficiary; onClose: () =
           </Field>
           <div className="flex gap-2 sm:col-span-2">
             <Button
-              onClick={() => {
-                s.addService(b.id, { type: sv.type, date: new Date(sv.date).toISOString(), activityId: sv.activityId || undefined, officeId: b.officeId, note: sv.note || undefined })
+              onClick={async () => {
+                if ((await s.addService(b.id, { type: sv.type, date: new Date(sv.date).toISOString(), activityId: sv.activityId || undefined, officeId: b.officeId, note: sv.note || undefined })) === false) return
                 setAdding(false)
               }}
             >
@@ -333,12 +362,21 @@ function RegisterModal({ initial, onClose, onOpen }: { initial: Beneficiary; onC
   const { scopeOffice } = usePerm()
   const [b, setB] = useState<Beneficiary>(initial)
   const [firstService, setFirstService] = useState<ServiceType | ''>(initial.id ? '' : 'consultation')
-  const dups = useMemo(() => possibleDuplicates(s.beneficiaries, b), [s.beneficiaries, b])
+  const localDups = useMemo(() => (LIVE ? [] : possibleDuplicates(s.beneficiaries, b)), [s.beneficiaries, b])
+  const [liveDups, setLiveDups] = useState<Beneficiary[]>([])
+  useEffect(() => {
+    if (!LIVE) return
+    const name = (b.name.ar || b.name.en).trim()
+    if (name.length < 5) return setLiveDups([])
+    const t = setTimeout(() => void fetchDuplicates(b).then((r) => setLiveDups(r.filter((x) => x.id !== b.id))).catch(() => undefined), 400)
+    return () => clearTimeout(t)
+  }, [b])
+  const dups = LIVE ? liveDups : localDups
   const isNew = !initial.id
   const valid = (b.name.ar.trim() || b.name.en.trim()) && b.birthYear > 1900 && b.birthYear <= THIS_YEAR
-  const save = () => {
+  const save = async () => {
     let out = b
-    if (isNew) {
+    if (isNew && !LIVE) {
       const seq = s.beneficiaries.length + 1300
       out = {
         ...b,
@@ -348,7 +386,7 @@ function RegisterModal({ initial, onClose, onOpen }: { initial: Beneficiary; onC
         services: firstService ? [{ id: `sv-${Date.now()}`, date: new Date().toISOString(), type: firstService, officeId: b.officeId }] : [],
       }
     }
-    s.saveBeneficiary(out)
+    if ((await s.saveBeneficiary(out, { firstService: firstService || undefined, notDuplicate: dups.length > 0 })) === false) return
     onClose()
   }
   return (
@@ -461,7 +499,8 @@ export function PatientStats() {
   const s = useStore()
   const { scopeOffice } = usePerm()
   const [office, setOffice] = useState(scopeOffice ?? '')
-  const list = s.beneficiaries.filter((b) => !office || b.officeId === office)
+  const st = usePatientStats(office || scopeOffice || '', LIVE)
+  const list = LIVE ? [] : s.beneficiaries.filter((b) => !office || b.officeId === office)
   const services = list.flatMap((b) => b.services)
 
   const months = Array.from({ length: 6 }, (_, i) => {
@@ -472,8 +511,8 @@ export function PatientStats() {
   })
   const trend = months.map((m) => ({
     m,
-    services: services.filter((x) => x.date.slice(0, 7) === m).length,
-    newReg: list.filter((b) => b.registeredAt.slice(0, 7) === m).length,
+    services: LIVE ? (st?.byMonth.find((x) => x.month === m)?.n ?? 0) : services.filter((x) => x.date.slice(0, 7) === m).length,
+    newReg: LIVE ? (st?.registeredByMonth.find((x) => x.month === m)?.n ?? 0) : list.filter((b) => b.registeredAt.slice(0, 7) === m).length,
   }))
   const tmax = Math.max(1, ...trend.map((t) => t.services))
   const ages: [string, (a: number) => boolean][] = [
@@ -483,10 +522,14 @@ export function PatientStats() {
     [ar ? '50 فأكثر' : '50 and over', (a) => a >= 50],
   ]
   const byOffice = s.offices
-    .map((o) => [o.name[lang], s.beneficiaries.filter((b) => b.officeId === o.id).length] as [string, number])
+    .map((o) => [o.name[lang], LIVE ? (st?.registeredByOffice.find((x) => x.officeId === o.id)?.n ?? 0) : s.beneficiaries.filter((b) => b.officeId === o.id).length] as [string, number])
     .filter((r) => r[1] > 0)
     .sort((a, b) => b[1] - a[1])
-  const f = list.filter((b) => b.gender === 'f').length
+  const f = LIVE ? (st?.women ?? 0) : list.filter((b) => b.gender === 'f').length
+  const nPeople = LIVE ? (st?.registered ?? 0) : list.length
+  const nServices = LIVE ? (st?.services ?? 0) : services.length
+  const nDisplaced = LIVE ? (st?.displaced ?? 0) : list.filter((b) => b.displaced).length
+  const ageCounts = LIVE ? [st?.ages.under5 ?? 0, st?.ages.a5_14 ?? 0, st?.ages.a15_49 ?? 0, st?.ages.over50 ?? 0] : null
 
   return (
     <div>
@@ -509,10 +552,10 @@ export function PatientStats() {
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {(
           [
-            [ar ? 'مستفيدون' : 'Beneficiaries', num(list.length)],
-            [ar ? 'خدمات مقدّمة' : 'Services delivered', num(services.length)],
-            [ar ? 'نسبة الإناث' : 'Female share', `${list.length ? Math.round((f / list.length) * 100) : 0}%`],
-            [ar ? 'نسبة النازحين' : 'Displaced share', `${list.length ? Math.round((list.filter((b) => b.displaced).length / list.length) * 100) : 0}%`],
+            [ar ? 'مستفيدون' : 'Beneficiaries', num(nPeople)],
+            [ar ? 'خدمات مقدّمة' : 'Services delivered', num(nServices)],
+            [ar ? 'نسبة الإناث' : 'Female share', `${nPeople ? Math.round((f / nPeople) * 100) : 0}%`],
+            [ar ? 'نسبة النازحين' : 'Displaced share', `${nPeople ? Math.round((nDisplaced / nPeople) * 100) : 0}%`],
           ] as [string, string][]
         ).map(([k, v]) => (
           <div key={k} className="rounded-lg border border-line bg-surface p-4">
@@ -537,16 +580,16 @@ export function PatientStats() {
           </div>
         </Panel>
         <Panel title={ar ? 'حسب نوع الخدمة' : 'By service type'}>
-          <Bars rows={(Object.keys(serviceName) as ServiceType[]).map((k) => [serviceName[k][lang], services.filter((x) => x.type === k).length] as [string, number]).filter((r) => r[1] > 0).sort((a, b) => b[1] - a[1])} color="bg-crescent" />
+          <Bars rows={(Object.keys(serviceName) as ServiceType[]).map((k) => [serviceName[k][lang], LIVE ? (st?.byType.find((x) => x.type === k)?.n ?? 0) : services.filter((x) => x.type === k).length] as [string, number]).filter((r) => r[1] > 0).sort((a, b) => b[1] - a[1])} color="bg-crescent" />
         </Panel>
         <Panel title={ar ? 'حسب الفئة العمرية' : 'By age group'}>
-          <Bars rows={ages.map(([k, fn]) => [k, list.filter((b) => fn(ageOf(b))).length])} />
+          <Bars rows={ages.map(([k, fn], i) => [k, ageCounts ? ageCounts[i] : list.filter((b) => fn(ageOf(b))).length])} />
         </Panel>
         <Panel title={ar ? 'حسب النوع' : 'By gender'}>
           <Bars
             rows={[
               [ar ? 'إناث' : 'Female', f],
-              [ar ? 'ذكور' : 'Male', list.length - f],
+              [ar ? 'ذكور' : 'Male', nPeople - f],
             ]}
             color="bg-leaf"
           />

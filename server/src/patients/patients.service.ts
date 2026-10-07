@@ -60,9 +60,13 @@ export class PatientsService {
     const [{ n }] = await this.db.select({ n: sql<number>`count(*)::int` }).from(beneficiaries).where(w)
     const rows = await this.db.select().from(beneficiaries).where(w).orderBy(desc(beneficiaries.registeredAt), desc(beneficiaries.no)).limit(q.limit).offset(q.offset)
     const counts = rows.length
-      ? await this.db.execute<{ beneficiary_id: string; n: number; last: string }>(sql`select beneficiary_id, count(*)::int n, max(date)::text last from beneficiary_services where beneficiary_id in (${sql.join(rows.map((r) => sql`${r.id}`), sql`, `)}) group by 1`)
+      ? await this.db.execute<{ beneficiary_id: string; n: number; last: string; last_type: string }>(sql`
+          select beneficiary_id, count(*)::int n, max(date)::text last,
+            (array_agg(type order by date desc, created_at desc))[1] as last_type
+          from beneficiary_services where beneficiary_id in (${sql.join(rows.map((r) => sql`${r.id}`), sql`, `)}) group by 1`)
       : { rows: [] }
-    return { total: n, items: rows.map((r) => ({ ...r, nameKey: undefined, phoneDigits: undefined, services: counts.rows.find((c) => c.beneficiary_id === r.id)?.n ?? 0, lastService: counts.rows.find((c) => c.beneficiary_id === r.id)?.last ?? null })) }
+    const by = new Map(counts.rows.map((c) => [c.beneficiary_id, c]))
+    return { total: n, items: rows.map((r) => ({ ...r, nameKey: undefined, phoneDigits: undefined, services: by.get(r.id)?.n ?? 0, lastService: by.get(r.id)?.last ?? null, lastServiceType: by.get(r.id)?.last_type ?? null })) }
   }
 
   async get(user: AuthUser, id: string) {
@@ -197,6 +201,14 @@ export class PatientsService {
       .groupBy(sql`1`)
       .orderBy(sql`1`)
     const [tot] = await this.db.select({ services: sql<number>`count(*)::int`, people: sql<number>`count(distinct beneficiary_id)::int` }).from(beneficiaryServices).where(sw)
-    return { ...reg, services: tot.services, peopleServed: tot.people, byType, byOffice, byMonth }
+    const ben = office ? sql`where office_id = ${office}` : sql``
+    const ages = (await this.db.execute<{ under5: number; a5_14: number; a15_49: number; over50: number }>(sql`
+      select count(*) filter (where ${sql.raw(String(year))} - birth_year < 5)::int under5,
+             count(*) filter (where ${sql.raw(String(year))} - birth_year between 5 and 14)::int a5_14,
+             count(*) filter (where ${sql.raw(String(year))} - birth_year between 15 and 49)::int a15_49,
+             count(*) filter (where ${sql.raw(String(year))} - birth_year >= 50)::int over50 from beneficiaries ${ben}`)).rows[0]
+    const registeredByMonth = (await this.db.execute<{ month: string; n: number }>(sql`select to_char(registered_at, 'YYYY-MM') as month, count(*)::int n from beneficiaries ${ben} group by 1 order by 1`)).rows
+    const registeredByOffice = (await this.db.execute<{ office_id: string; n: number }>(sql`select office_id, count(*)::int n from beneficiaries ${ben} group by 1 order by 2 desc`)).rows.map((r) => ({ officeId: r.office_id, n: r.n }))
+    return { ...reg, services: tot.services, peopleServed: tot.people, byType, byOffice, byMonth, ages: { under5: ages.under5, a5_14: ages.a5_14, a15_49: ages.a15_49, over50: ages.over50 }, registeredByMonth, registeredByOffice }
   }
 }

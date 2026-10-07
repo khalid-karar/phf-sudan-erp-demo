@@ -1,5 +1,5 @@
 // The store's write actions in live mode: each one asks the server, and the screen then shows what the server holds.
-import type { Item, ShipmentLine, Vehicle, FuelLog, Account, PayMethod, SettlementItem, FieldActivity, FieldReport, ApprovalRule, ControlMode, Office, OrgSettings, Reallocation, Role, SpendRequest, User } from '../data/types'
+import type { Beneficiary, Service, ServiceType, Employee, LeaveRequest, Item, ShipmentLine, Vehicle, FuelLog, Account, PayMethod, SettlementItem, FieldActivity, FieldReport, ApprovalRule, ControlMode, Office, OrgSettings, Reallocation, Role, SpendRequest, User } from '../data/types'
 import { useStore } from '../lib/store'
 import { ApiError, api } from './http'
 import { act, errorText, refreshData } from './live'
@@ -259,6 +259,46 @@ Object.assign(liveActions, {
   saveVehicle: (v: Vehicle) => act(() => api.patch(`/logistics/vehicles/${v.id}`, { status: v.status, driver: v.driver.en || v.driver.ar || null, nextServiceKm: v.nextServiceKm || null }), { ok: { ar: 'حُفظت المركبة', en: 'Vehicle saved' } }),
   addFuel: (vehicleId: string, f: Omit<FuelLog, 'id'>) =>
     act(() => api.post(`/logistics/vehicles/${vehicleId}/fuel`, { liters: String(f.liters), costSdg: String(f.costSDG), odometer: f.odometer }), { ok: { ar: 'سُجّل الوقود', en: 'Fuel recorded' } }),
+})
+
+Object.assign(liveActions, {
+  saveEmployee: (e: Employee) => {
+    const exists = useStore.getState().employees.some((x) => x.id === e.id)
+    const allocations = e.allocations.filter((a) => a.pct > 0).map((a) => ({ lineId: a.lineId, pct: Math.round(a.pct) }))
+    const common = { nameAr: e.name.ar, nameEn: e.name.en, officeId: e.officeId, positionAr: e.position.ar, positionEn: e.position.en, department: e.department, contract: e.contract, salarySdg: String(e.salarySDG), phone: e.phone || undefined, leaveBalance: e.leaveBalance, allocations }
+    return act(
+      () => (exists ? api.patch(`/hr/employees/${e.id}`, { ...common, phone: e.phone || null, endDate: e.endDate ?? null, status: e.status === 'ended' ? 'ended' : 'active', userId: e.userId ?? null }) : api.post('/hr/employees', { ...common, startDate: e.startDate.slice(0, 10), endDate: e.endDate?.slice(0, 10), userId: e.userId })),
+      { ok: { ar: 'حُفظ الموظف', en: 'Employee saved' } },
+    )
+  },
+  requestLeave: (l: Omit<LeaveRequest, 'id' | 'status' | 'createdAt'>) =>
+    act(() => api.post('/hr/leave', { employeeId: l.employeeId, type: l.type, from: l.from.slice(0, 10), to: l.to.slice(0, 10), note: l.note }), { ok: { ar: 'أُرسل طلب الإجازة', en: 'Leave request sent' } }),
+  decideLeave: (id: string, approve: boolean) =>
+    act(() => api.post(`/hr/leave/${id}/decision`, { decision: approve ? 'approve' : 'reject' }), { ok: approve ? { ar: 'اعتُمدت الإجازة', en: 'Leave approved' } : { ar: 'رُفضت الإجازة', en: 'Leave rejected' } }),
+  postPayroll: (period: string) => act(() => api.post('/hr/payroll', { period, accountCode: BANK_SDG }), { ok: { ar: 'رُحّلت الرواتب', en: 'Payroll posted' } }),
+})
+
+const touchPatients = () => useStore.setState((s) => ({ patientsVersion: (s.patientsVersion ?? 0) + 1 }))
+
+Object.assign(liveActions, {
+  saveBeneficiary: async (b: Beneficiary, opts?: { firstService?: ServiceType; notDuplicate?: boolean }) => {
+    const isNew = !b.no
+    const common = { nameAr: b.name.ar || b.name.en, gender: b.gender, birthYear: b.birthYear, locality: b.locality || undefined, displaced: b.displaced, phone: b.phone || undefined }
+    const ok = await act(
+      () =>
+        isNew
+          ? api.post('/patients', { ...common, nameEn: b.name.en || undefined, officeId: b.officeId, confirmNotDuplicate: !!opts?.notDuplicate, service: opts?.firstService ? { type: opts.firstService } : undefined })
+          : api.patch(`/patients/${b.id}`, { ...common, nameEn: b.name.en || null, locality: b.locality || null, phone: b.phone || null }),
+      { ok: isNew ? { ar: 'سُجّل المستفيد', en: 'Beneficiary registered' } : { ar: 'حُفظت البيانات', en: 'Saved' } },
+    )
+    if (ok) touchPatients()
+    return ok
+  },
+  addService: async (id: string, sv: Omit<Service, 'id'>) => {
+    const ok = await act(() => api.post(`/patients/${id}/services`, { type: sv.type, date: sv.date.slice(0, 10), activityId: sv.activityId, note: sv.note }), { ok: { ar: 'سُجّلت الخدمة', en: 'Service recorded' } })
+    if (ok) touchPatients()
+    return ok
+  },
 })
 
 let syncing = false
