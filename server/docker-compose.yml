@@ -1,0 +1,63 @@
+# Runs the API, PostgreSQL, nightly backups and HTTPS on one server.
+#   cp .env.example .env   # then fill in the values
+#   docker compose up -d
+#   docker compose exec api node dist/db/bootstrap.js   # first run only
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: phf_erp
+      POSTGRES_USER: phf
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U phf -d phf_erp']
+      interval: 10s
+      retries: 5
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://phf:${DB_PASSWORD}@db:5432/phf_erp
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://erp.example.org}
+      TRUST_PROXY: 'true'
+      PORT: 3000
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+
+  # Daily compressed dump, 30 days kept, in ./backups on the host.
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    depends_on: [db]
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: >
+      sh -c 'while true; do
+        pg_dump -h db -U phf -d phf_erp -Fc -f /backups/phf_erp_$$(date +%Y-%m-%d).dump &&
+        find /backups -name "*.dump" -mtime +30 -delete;
+        sleep 86400; done'
+
+  # HTTPS with automatic certificates. Point the domain's DNS at this server first.
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [api]
+    ports: ['80:80', '443:443']
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+    command: caddy reverse-proxy --from ${API_DOMAIN} --to api:3000
+    volumes:
+      - caddy_data:/data
+
+volumes:
+  pgdata:
+  caddy_data:

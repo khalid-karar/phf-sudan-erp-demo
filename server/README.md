@@ -1,0 +1,202 @@
+# PHF Sudan ERP — API server
+
+The backend for the Kuwait Patients Helping Fund (Sudan) ERP. This first phase covers the core that everything else builds on:
+
+- sign-in, roles and permissions
+- offices, users and roles administration
+- projects with pillars, budget lines and spending ceilings
+- spend requests, reallocations and the approval engine
+- field activities and field reports, including offline re-sends
+- the accounting ledger: chart of accounts, vouchers, cash advances, exchange rates, revaluation, month close and reports
+
+Stack: Node 22, NestJS 11, PostgreSQL 16, Drizzle ORM. Everything is plain JavaScript plus PostgreSQL, so nothing extra has to be downloaded on the server.
+
+## Run it locally
+
+```bash
+cp .env.example .env              # set DATABASE_URL and JWT_SECRET
+npm install
+npm run build
+npm run db:migrate                # creates the tables and the ledger guards
+npm run db:seed                   # demo data: same organisation as the clickable demo
+npm run dev                       # http://localhost:3000/health
+npm test                          # 44 tests against a real database (phf_erp_test)
+```
+
+All seeded demo users sign in with the password `Phf-Demo-2026` (change it with `SEED_PASSWORD`). Their emails are in `../src/data/seed.ts`, for example `finance@kphfs.org` (Finance & Admin Manager), `m.osman@kphfs.org` (field officer, Kassala) and `it@kphfs.org` (system administrator).
+
+## Deploy on the Saudi server
+
+The server needs Docker, and a domain name (e.g. `api.erp.kphfs.org`) whose DNS points at it.
+
+```bash
+git clone https://github.com/khalid-karar/phf-sudan-erp-demo.git && cd phf-sudan-erp-demo/server
+cp .env.example .env              # set DB_PASSWORD, JWT_SECRET, API_DOMAIN, CORS_ORIGINS, BOOTSTRAP_ADMIN_EMAIL
+docker compose up -d --build      # API + PostgreSQL + nightly backups + HTTPS (Caddy)
+docker compose exec api node dist/db/bootstrap.js
+```
+
+The last command runs once. It sets up the organisation, the HQ office, the standard roles, the chart of accounts and the approval rules, then prints a temporary password for the administrator. The administrator must change that password at first sign-in.
+
+- **Upgrades:** `git pull && docker compose up -d --build`. Pending migrations are applied when the API starts.
+- **Backups:** a compressed dump is written to `./backups` every day, and dumps older than 30 days are deleted. Copy that folder off the server too.
+- **Restore a backup:** `docker compose exec -T db pg_restore -U phf -d phf_erp --clean < backups/phf_erp_YYYY-MM-DD.dump`.
+
+## How it works
+
+### Money
+
+Amounts are stored as exact decimals, never floating point:
+- USD as `numeric(18,2)`
+- SDG as `numeric(20,2)`
+- exchange rates as `numeric(14,4)`
+
+The API sends and receives amounts as strings such as `"1836.73"`. Calculations use integer cents (`src/lib/money.ts`).
+
+The books are kept in USD. Every line posted to an SDG cash box or bank also stores the exact SDG amount that moved. That is what makes the monthly revaluation correct.
+
+### The ledger cannot be corrupted
+
+Everything that touches the books goes through one function, `post()` in `src/ledger/posting.ts`. On top of that, the database enforces the rules itself (`migrations/0001_ledger_guards.sql`), so no script or manual SQL can get around them:
+
+- every entry balances (checked at commit) and has at least two lines
+- posted entries and lines cannot be edited or deleted; corrections are made with a reversing entry
+- header accounts and inactive accounts take no postings
+- SDG accounts must carry their SDG amount
+- a month that is closed for an office takes no new lines for that office (an advisory lock makes closing and posting wait for each other)
+
+On top of the database rules, the application layer adds a few more:
+- SDG lines must carry their SDG amount in the same direction as the USD side
+- manual entries can't touch the staff advances account
+- manual entries can't push a budget line over its ceiling
+
+### Month close
+
+A month can be closed for an office when all of these hold:
+- the month has ended
+- advances due in it are settled
+- every expense tied to an activity has its field report
+- the cash has been counted
+- nothing is left to revalue at the month-end rate
+
+### Budgets and ceilings
+
+For each budget line, **available = ceiling − spent − committed − in approval**:
+
+| Term | What it includes |
+|---|---|
+| ceiling | the original ceiling, plus or minus approved reallocations |
+| spent | cash spending posted to expense accounts and tagged with the line |
+| committed | approved requests not yet paid, plus open cash advances |
+| in approval | pending requests, plus pending reallocations out of the line |
+
+The same check runs at the line, pillar and project level:
+- **Hard mode:** anything over a ceiling is blocked.
+- **Soft mode:** up to the tolerance percentage over is allowed, with the Executive Director added to the approval chain.
+
+Requests are checked while their project is locked. Two people requesting the last of a line's money at the same moment cannot both get it; a test covers this.
+
+In-kind supplies issued to an activity are shown on the line (`inKind`), but they do not count against the cash ceiling.
+
+### Approvals
+
+An approval rule is a band of amounts plus a chain of roles. The band includes its minimum and excludes its maximum (`[min, max)`), and a rule for a specific office wins over a general one.
+
+The engine enforces the following:
+- only the role whose step is pending can act
+- office-scoped approvers only act for their own office
+- nobody can approve their own request
+- a rejection needs a reason
+
+The rule editor flags gaps and overlaps between bands.
+
+### Cash advances and field reports
+
+An advance can only be issued for a field activity. It can only be settled once that activity's field report is in, which is how the timing gap between technical and financial reports is closed.
+
+An advance remembers the currency it was handed out in, the amount and the issue rate. Receipts at settlement are entered in that currency. Settlement:
+- books the actual spending to the line, valued at the issue rate
+- puts the exact pounds returned back into the office cash box
+- pays any top-up at today's rate; a top-up must fit under the line ceiling
+
+Field reports are idempotent by `clientId`. A phone that re-sends the same offline report does not create a duplicate.
+
+### Permissions
+
+Every route declares the module and access level it needs, e.g. `@Perm('finance', 'edit')`. On every request, the user and their role are reloaded from the database, so deactivating a user or changing a role takes effect immediately.
+
+Office-scoped roles only see and act on their own office's records:
+- requests, activities, vouchers and advances
+- cash position, journal and trial balance
+- month close, payments and manual entries
+
+Reallocations belong to a project, not an office. A field officer can ask for one, and the money stays reserved on the giving line until the Finance Manager and Executive Director decide.
+
+The system always keeps at least one active user who can manage settings, so the organisation cannot lock itself out.
+
+### Security
+
+- Passwords are hashed with argon2id.
+- An account locks for 15 minutes after 5 failed sign-ins.
+- Access tokens last 15 minutes. Refresh tokens last 30 days and are rotated on each use; re-using an old refresh token signs out that whole session family.
+- Users created by an administrator get a temporary password they must change first.
+- Sign-in is rate-limited.
+- Security headers are set with Helmet, and CORS is restricted to the listed origins.
+- Every change is written to `audit_log` in the same transaction as the change itself.
+- In production the API refuses to start with a placeholder `JWT_SECRET`.
+
+## API
+
+The base path is `/api/v1`. Send `Authorization: Bearer <accessToken>`.
+
+Errors look like `{ code, message: { ar, en }, details? }`, so the app can show the message in the user's language and react to the `code`.
+
+| Area | Endpoints | Needs |
+|---|---|---|
+| Sign-in | `POST auth/login`, `auth/refresh`, `auth/logout`, `auth/change-password`, `GET auth/me` | — |
+| Organisation | `GET org/settings`, `PUT org/settings` | settings: manage (to change) |
+| Offices | `GET offices`, `POST offices`, `PATCH offices/:id` | settings: manage (to change) |
+| Roles | `GET roles`, `POST roles`, `PATCH roles/:id`, `DELETE roles/:id` | settings: manage (to change) |
+| Users | `GET users`, `POST users`, `PATCH users/:id`, `POST users/:id/reset-password` | settings: manage |
+| Projects | `GET projects`, `GET projects/:id` (tree with usage), `POST projects/check` (ceiling check) | projects: view |
+| Budget set-up | `POST projects`, `PATCH projects/:id/control`, `PATCH projects/lines/:lineId` | projects: manage |
+| Approval rules | `GET approval-rules` (with gap/overlap warnings), `GET approval-rules/preview` | projects: view |
+| | `POST`, `PUT`, `DELETE approval-rules` | settings: edit |
+| Spend requests | `GET requests`, `GET requests/:id`, `POST requests/:id/decision` | projects: view |
+| | `POST requests`, `POST requests/:id/cancel` | projects: edit |
+| Reallocations | `GET reallocations`, `POST reallocations/:id/decision` | projects: view |
+| | `POST reallocations` | projects: edit |
+| Approvals inbox | `GET approvals/inbox` | projects: view, approver role |
+| Activities | `GET activities`, `GET activities/:id`, `GET activities/matching` | activities: view |
+| | `POST activities`, `POST activities/:id/report` | activities: edit |
+| Chart of accounts | `GET finance/accounts` | finance: view |
+| | `GET finance/accounts/suggest-code/:parent` | finance: edit |
+| | `POST finance/accounts`, `PATCH finance/accounts/:code`, `PUT finance/system-accounts` | finance: manage |
+| Journal | `GET finance/journal`, `GET finance/journal/:id` | finance: view |
+| | `POST finance/journal` (manual entry) | finance: edit |
+| | `POST finance/journal/:id/reverse` | finance: manage |
+| Exchange rates | `GET finance/rates` | finance: view |
+| | `POST finance/rates` | finance: edit |
+| Payments & receipts | `GET finance/vouchers`, `GET finance/awaiting-payment`, `GET finance/cash-position` | finance: view |
+| | `POST finance/requests/:id/pay`, `POST finance/receipts` | finance: edit |
+| Cash advances | `GET finance/advances`, `GET finance/advances/:id` | finance: view |
+| | `POST finance/advances/:id/settle` | finance: edit |
+| FX revaluation | `GET finance/revaluation` (preview) | finance: view |
+| | `POST finance/revaluation` | finance: manage |
+| Month close | `GET finance/close/:period` | finance: view |
+| | `PUT finance/close/:period/:office/cash-counted` | finance: edit |
+| | `POST finance/close/:period/:office`, `POST finance/close/:period/:office/reopen` | finance: manage |
+| Reports | `GET finance/reports/trial-balance`, `GET finance/reports/activities`, `GET finance/reports/budget-vs-actual/:projectId` | finance: view |
+
+## Next phase
+
+These follow the same patterns as the modules above:
+- supply chain and logistics (stock, receipts, issues, shipments, fleet)
+- HR and payroll posting
+- beneficiaries
+- notifications engine and email/WhatsApp/SMS delivery
+- HQ report PDF and email sending
+- file attachments for receipts and photos
+- connecting the React app to this API in place of its in-browser data
+
+The system accounts the ledger needs for stock and payroll (`inventory`, `inkind_revenue`, `salaries`, `payroll_deductions`) are already configured.

@@ -1,0 +1,689 @@
+{
+ "roles": [
+  {
+   "id": "admin",
+   "nameAr": "مدير النظام",
+   "nameEn": "System administrator",
+   "descAr": "قسم تقنية المعلومات: يدير المكاتب والمستخدمين والصلاحيات والقنوات",
+   "descEn": "IT: manages offices, users, permissions and channels",
+   "permissions": {
+    "dashboard": "view",
+    "projects": "manage",
+    "activities": "manage",
+    "finance": "manage",
+    "supply": "manage",
+    "logistics": "manage",
+    "patients": "manage",
+    "hr": "manage",
+    "reports": "manage",
+    "alerts": "manage",
+    "settings": "manage"
+   },
+   "scope": "all",
+   "canApprove": false,
+   "system": true
+  },
+  {
+   "id": "executive_director",
+   "nameAr": "المدير التنفيذي",
+   "nameEn": "Executive Director",
+   "descAr": "يرى كل شيء ويعتمد المبالغ الكبيرة والمناقلات",
+   "descEn": "Sees everything; approves large amounts and reallocations",
+   "permissions": {
+    "dashboard": "view",
+    "projects": "manage",
+    "activities": "view",
+    "finance": "view",
+    "supply": "view",
+    "logistics": "view",
+    "patients": "view",
+    "hr": "view",
+    "reports": "manage",
+    "alerts": "edit",
+    "settings": "view"
+   },
+   "scope": "all",
+   "canApprove": true,
+   "system": true
+  },
+  {
+   "id": "finance_manager",
+   "nameAr": "مدير الشؤون المالية والإدارية",
+   "nameEn": "Finance & Admin Manager",
+   "descAr": "يدير المالية والصرف والإقفال وقواعد الاعتماد والتقارير",
+   "descEn": "Runs finance, payments, close, approval rules and reports",
+   "permissions": {
+    "dashboard": "view",
+    "projects": "manage",
+    "activities": "view",
+    "finance": "manage",
+    "supply": "view",
+    "logistics": "view",
+    "patients": "none",
+    "hr": "view",
+    "reports": "manage",
+    "alerts": "edit",
+    "settings": "edit"
+   },
+   "scope": "all",
+   "canApprove": true,
+   "system": true
+  },
+  {
+   "id": "accountant",
+   "nameAr": "محاسب",
+   "nameEn": "Accountant",
+   "descAr": "يعدّ السندات والقيود ويتابع العهد",
+   "descEn": "Prepares vouchers and entries, follows up advances",
+   "permissions": {
+    "dashboard": "view",
+    "projects": "view",
+    "activities": "view",
+    "finance": "edit",
+    "supply": "none",
+    "logistics": "none",
+    "patients": "none",
+    "hr": "none",
+    "reports": "view",
+    "alerts": "view",
+    "settings": "none"
+   },
+   "scope": "all",
+   "canApprove": false,
+   "system": false
+  },
+  {
+   "id": "supervisor",
+   "nameAr": "المشرف",
+   "nameEn": "Supervisor",
+   "descAr": "يعتمد طلبات الصرف ويتابع الأنشطة الميدانية",
+   "descEn": "Approves spend requests and follows field activities",
+   "permissions": {
+    "dashboard": "view",
+    "projects": "edit",
+    "activities": "edit",
+    "finance": "none",
+    "supply": "view",
+    "logistics": "view",
+    "patients": "view",
+    "hr": "none",
+    "reports": "view",
+    "alerts": "view",
+    "settings": "none"
+   },
+   "scope": "all",
+   "canApprove": true,
+   "system": true
+  },
+  {
+   "id": "field_officer",
+   "nameAr": "مسؤول ميداني",
+   "nameEn": "Field officer",
+   "descAr": "يقدّم طلبات الصرف والتقارير الفنية لمكتبه",
+   "descEn": "Submits spend requests and field reports for their office",
+   "permissions": {
+    "dashboard": "view",
+    "projects": "edit",
+    "activities": "edit",
+    "finance": "none",
+    "supply": "view",
+    "logistics": "none",
+    "patients": "edit",
+    "hr": "none",
+    "reports": "none",
+    "alerts": "view",
+    "settings": "none"
+   },
+   "scope": "office",
+   "canApprove": false,
+   "system": true
+  },
+  {
+   "id": "storekeeper",
+   "nameAr": "أمين المخزن",
+   "nameEn": "Storekeeper",
+   "descAr": "يستلم التغذية العينية ويصرف المواد",
+   "descEn": "Receives in-kind supplies and issues stock",
+   "permissions": {
+    "dashboard": "view",
+    "projects": "none",
+    "activities": "view",
+    "finance": "none",
+    "supply": "manage",
+    "logistics": "edit",
+    "patients": "none",
+    "hr": "none",
+    "reports": "none",
+    "alerts": "view",
+    "settings": "none"
+   },
+   "scope": "all",
+   "canApprove": false,
+   "system": false
+  },
+  {
+   "id": "logistics_officer",
+   "nameAr": "مسؤول اللوجستيات",
+   "nameEn": "Logistics officer",
+   "descAr": "الشحنات بين الرئاسة والمكاتب والمركبات",
+   "descEn": "Shipments between HQ and offices, vehicles",
+   "permissions": {
+    "dashboard": "view",
+    "projects": "none",
+    "activities": "none",
+    "finance": "none",
+    "supply": "view",
+    "logistics": "manage",
+    "patients": "none",
+    "hr": "none",
+    "reports": "none",
+    "alerts": "view",
+    "settings": "none"
+   },
+   "scope": "all",
+   "canApprove": false,
+   "system": false
+  },
+  {
+   "id": "hr_officer",
+   "nameAr": "مسؤول الموارد البشرية",
+   "nameEn": "HR officer",
+   "descAr": "الموظفون والإجازات والرواتب",
+   "descEn": "Staff, leave and payroll",
+   "permissions": {
+    "dashboard": "view",
+    "projects": "none",
+    "activities": "none",
+    "finance": "none",
+    "supply": "none",
+    "logistics": "none",
+    "patients": "none",
+    "hr": "manage",
+    "reports": "none",
+    "alerts": "view",
+    "settings": "none"
+   },
+   "scope": "all",
+   "canApprove": false,
+   "system": false
+  },
+  {
+   "id": "registrar",
+   "nameAr": "موظف تسجيل المرضى",
+   "nameEn": "Patient registrar",
+   "descAr": "يسجّل المستفيدين والخدمات المقدّمة لهم",
+   "descEn": "Registers beneficiaries and the services they receive",
+   "permissions": {
+    "dashboard": "view",
+    "projects": "none",
+    "activities": "view",
+    "finance": "none",
+    "supply": "none",
+    "logistics": "none",
+    "patients": "manage",
+    "hr": "none",
+    "reports": "none",
+    "alerts": "view",
+    "settings": "none"
+   },
+   "scope": "office",
+   "canApprove": false,
+   "system": false
+  }
+ ],
+ "accounts": [
+  {
+   "code": "1",
+   "parentCode": null,
+   "nameAr": "الأصول",
+   "nameEn": "Assets",
+   "type": "asset",
+   "postable": false,
+   "currency": "USD"
+  },
+  {
+   "code": "11",
+   "parentCode": "1",
+   "nameAr": "الأصول المتداولة",
+   "nameEn": "Current assets",
+   "type": "asset",
+   "postable": false,
+   "currency": "USD"
+  },
+  {
+   "code": "1101",
+   "parentCode": "11",
+   "nameAr": "النقدية بصناديق المكاتب",
+   "nameEn": "Office cash boxes",
+   "type": "asset",
+   "postable": false,
+   "currency": "USD"
+  },
+  {
+   "code": "1102",
+   "parentCode": "11",
+   "nameAr": "النقدية بالبنوك",
+   "nameEn": "Cash at bank",
+   "type": "asset",
+   "postable": false,
+   "currency": "USD"
+  },
+  {
+   "code": "1103",
+   "parentCode": "11",
+   "nameAr": "العُهد النقدية للموظفين",
+   "nameEn": "Staff cash advances",
+   "type": "asset",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "1104",
+   "parentCode": "11",
+   "nameAr": "منح مستحقة من المانحين",
+   "nameEn": "Grants receivable",
+   "type": "asset",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "1105",
+   "parentCode": "11",
+   "nameAr": "مخزون المواد الطبية والغذائية",
+   "nameEn": "Medical & food stock",
+   "type": "asset",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "12",
+   "parentCode": "1",
+   "nameAr": "الأصول الثابتة",
+   "nameEn": "Fixed assets",
+   "type": "asset",
+   "postable": false,
+   "currency": "USD"
+  },
+  {
+   "code": "1201",
+   "parentCode": "12",
+   "nameAr": "المركبات",
+   "nameEn": "Vehicles",
+   "type": "asset",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "1202",
+   "parentCode": "12",
+   "nameAr": "الأجهزة الطبية",
+   "nameEn": "Medical equipment",
+   "type": "asset",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "1203",
+   "parentCode": "12",
+   "nameAr": "الأثاث والمعدات المكتبية",
+   "nameEn": "Furniture & office equipment",
+   "type": "asset",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "1209",
+   "parentCode": "12",
+   "nameAr": "مجمع الإهلاك",
+   "nameEn": "Accumulated depreciation",
+   "type": "asset",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "2",
+   "parentCode": null,
+   "nameAr": "الالتزامات",
+   "nameEn": "Liabilities",
+   "type": "liability",
+   "postable": false,
+   "currency": "USD"
+  },
+  {
+   "code": "21",
+   "parentCode": "2",
+   "nameAr": "الالتزامات المتداولة",
+   "nameEn": "Current liabilities",
+   "type": "liability",
+   "postable": false,
+   "currency": "USD"
+  },
+  {
+   "code": "2101",
+   "parentCode": "21",
+   "nameAr": "الموردون",
+   "nameEn": "Suppliers payable",
+   "type": "liability",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "2102",
+   "parentCode": "21",
+   "nameAr": "مستحقات الموظفين",
+   "nameEn": "Staff payables",
+   "type": "liability",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "2103",
+   "parentCode": "21",
+   "nameAr": "منح مقبوضة مقدماً",
+   "nameEn": "Grants received in advance",
+   "type": "liability",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "2104",
+   "parentCode": "21",
+   "nameAr": "أمانات وتأمينات",
+   "nameEn": "Deposits held",
+   "type": "liability",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "3",
+   "parentCode": null,
+   "nameAr": "صافي الأصول",
+   "nameEn": "Net assets",
+   "type": "net_assets",
+   "postable": false,
+   "currency": "USD"
+  },
+  {
+   "code": "3101",
+   "parentCode": "3",
+   "nameAr": "صافي الأصول غير المقيدة",
+   "nameEn": "Unrestricted net assets",
+   "type": "net_assets",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "3102",
+   "parentCode": "3",
+   "nameAr": "صافي الأصول المقيدة",
+   "nameEn": "Restricted net assets",
+   "type": "net_assets",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "4",
+   "parentCode": null,
+   "nameAr": "الإيرادات",
+   "nameEn": "Revenue",
+   "type": "revenue",
+   "postable": false,
+   "currency": "USD"
+  },
+  {
+   "code": "4101",
+   "parentCode": "4",
+   "nameAr": "منح نقدية مقيدة بمشاريع",
+   "nameEn": "Restricted project grants",
+   "type": "revenue",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "4102",
+   "parentCode": "4",
+   "nameAr": "تبرعات عامة غير مقيدة",
+   "nameEn": "Unrestricted donations",
+   "type": "revenue",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "4103",
+   "parentCode": "4",
+   "nameAr": "تبرعات عينية (التغذية)",
+   "nameEn": "In-kind donations (replenishment)",
+   "type": "revenue",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "4104",
+   "parentCode": "4",
+   "nameAr": "أرباح فروق العملة",
+   "nameEn": "Foreign exchange gains",
+   "type": "revenue",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5",
+   "parentCode": null,
+   "nameAr": "المصروفات",
+   "nameEn": "Expenses",
+   "type": "expense",
+   "postable": false,
+   "currency": "USD"
+  },
+  {
+   "code": "51",
+   "parentCode": "5",
+   "nameAr": "مصروفات البرامج",
+   "nameEn": "Programme expenses",
+   "type": "expense",
+   "postable": false,
+   "currency": "USD"
+  },
+  {
+   "code": "5101",
+   "parentCode": "51",
+   "nameAr": "الخدمات العلاجية",
+   "nameEn": "Treatment services",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5102",
+   "parentCode": "51",
+   "nameAr": "الأدوية والمستلزمات الطبية",
+   "nameEn": "Medicines & medical supplies",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5103",
+   "parentCode": "51",
+   "nameAr": "التدريب وبناء القدرات",
+   "nameEn": "Training & capacity building",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5104",
+   "parentCode": "51",
+   "nameAr": "التغذية العلاجية",
+   "nameEn": "Therapeutic nutrition",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5105",
+   "parentCode": "51",
+   "nameAr": "حوافز الكوادر الميدانية",
+   "nameEn": "Field staff incentives",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "52",
+   "parentCode": "5",
+   "nameAr": "المصروفات الإدارية والتشغيلية",
+   "nameEn": "Admin & operating expenses",
+   "type": "expense",
+   "postable": false,
+   "currency": "USD"
+  },
+  {
+   "code": "5201",
+   "parentCode": "52",
+   "nameAr": "الرواتب والأجور",
+   "nameEn": "Salaries & wages",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5202",
+   "parentCode": "52",
+   "nameAr": "الوقود والتنقلات",
+   "nameEn": "Fuel & transport",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5203",
+   "parentCode": "52",
+   "nameAr": "الاتصالات والإنترنت",
+   "nameEn": "Communications & internet",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5204",
+   "parentCode": "52",
+   "nameAr": "القرطاسية والمطبوعات",
+   "nameEn": "Stationery & printing",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5205",
+   "parentCode": "52",
+   "nameAr": "الرسوم البنكية",
+   "nameEn": "Bank charges",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5206",
+   "parentCode": "52",
+   "nameAr": "خسائر فروق العملة",
+   "nameEn": "Foreign exchange losses",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5207",
+   "parentCode": "52",
+   "nameAr": "الإيجارات",
+   "nameEn": "Rent",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5208",
+   "parentCode": "52",
+   "nameAr": "المتابعة والتقييم والتدقيق",
+   "nameEn": "Monitoring, evaluation & audit",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5209",
+   "parentCode": "52",
+   "nameAr": "التأمين والأمن",
+   "nameEn": "Insurance & security",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  },
+  {
+   "code": "5299",
+   "parentCode": "52",
+   "nameAr": "مصروفات أخرى",
+   "nameEn": "Other expenses",
+   "type": "expense",
+   "postable": true,
+   "currency": "USD"
+  }
+ ],
+ "rules": [
+  {
+   "nameAr": "مبالغ صغيرة",
+   "nameEn": "Small amounts",
+   "kind": "spend",
+   "minUsd": "0.00",
+   "maxUsd": "500.00",
+   "chain": [
+    "supervisor"
+   ]
+  },
+  {
+   "nameAr": "مبالغ متوسطة",
+   "nameEn": "Medium amounts",
+   "kind": "spend",
+   "minUsd": "500.00",
+   "maxUsd": "5000.00",
+   "chain": [
+    "supervisor",
+    "finance_manager"
+   ]
+  },
+  {
+   "nameAr": "مبالغ كبيرة",
+   "nameEn": "Large amounts",
+   "kind": "spend",
+   "minUsd": "5000.00",
+   "maxUsd": null,
+   "chain": [
+    "supervisor",
+    "finance_manager",
+    "executive_director"
+   ]
+  },
+  {
+   "nameAr": "المناقلة بين البنود",
+   "nameEn": "Budget reallocation",
+   "kind": "reallocation",
+   "minUsd": "0.00",
+   "maxUsd": null,
+   "chain": [
+    "finance_manager",
+    "executive_director"
+   ]
+  }
+ ],
+ "systemAccounts": {
+  "cash_boxes": "1101",
+  "banks": "1102",
+  "advances": "1103",
+  "fx_gain": "4104",
+  "fx_loss": "5206",
+  "inventory": "1105",
+  "inkind_revenue": "4103",
+  "salaries": "5201",
+  "payroll_deductions": "2104"
+ }
+}
