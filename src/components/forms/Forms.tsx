@@ -45,7 +45,7 @@ function Sheet({ org, dept, title, titleEn, formNo, children, dir = 'rtl' }: { o
 const Row = ({ l, v, w = '50%' }: { l: string; v?: ReactNode; w?: string }) => (
   <div style={{ display: 'inline-block', width: w, verticalAlign: 'top', padding: '2px 0' }}>
     <b>{l} </b>
-    <span style={{ borderBottom: '1px dotted #666', minWidth: 80, display: 'inline-block' }}>{v || ' '}</span>
+    <span style={{ borderBottom: '1px dotted #666', minWidth: 80, display: 'inline-block' }}>{v ? <bdi>{v}</bdi> : ' '}</span>
   </div>
 )
 
