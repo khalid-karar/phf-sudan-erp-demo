@@ -169,6 +169,7 @@ export const mapActivity = (a: T.ActivityDto): FieldActivity => ({
   inKind: a.inKind || undefined,
   report: a.report
     ? {
+        id: a.report.id,
         no: a.report.no,
         submittedAt: a.report.submittedAt,
         doneOn: opt(a.report.doneOn),

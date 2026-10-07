@@ -167,6 +167,7 @@ export interface ExpenseDto {
   hasTechReport: boolean
 }
 export interface FieldReportDto {
+  id: string
   no: string
   doneOn: string | null
   beneficiaries: number

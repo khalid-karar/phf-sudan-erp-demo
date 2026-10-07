@@ -1,5 +1,7 @@
 import { CalendarDays, Camera, Check, Circle, ClipboardList, FilePlus2, MapPin, Plus, Search, Users } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { LIVE } from '../../api/http'
+import { ServerPhotos } from '../../api/ServerPhotos'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button, Field, inputCls, Modal, PageHeader, Panel, StatusBadge, UsageBar } from '../../components/ui'
 import { activityTypes } from '../../data/finance'
@@ -472,7 +474,8 @@ export function ActivityDetail() {
                     {a.report.issues}
                   </p>
                 )}
-                {!!a.report.photos?.length && (
+                {LIVE && a.report.id && <ServerPhotos reportId={a.report.id} onOpen={setPhoto} />}
+                {!LIVE && !!a.report.photos?.length && (
                   <div className="mt-4 grid grid-cols-3 gap-2">
                     {a.report.photos.map((p, i) => (
                       <button key={i} onClick={() => setPhoto(p)} className="aspect-square overflow-hidden rounded-md ring-1 ring-line">

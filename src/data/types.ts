@@ -248,6 +248,7 @@ export interface Staff {
 export type ActivityType = 'medical_day' | 'clinic' | 'distribution' | 'training' | 'transport' | 'awareness' | 'other'
 
 export interface FieldReport {
+  id?: string // live mode: the server's id, used to fetch the photos
   no: string
   submittedAt: string
   doneOn?: string
