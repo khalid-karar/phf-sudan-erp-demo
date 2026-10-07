@@ -15,6 +15,7 @@ import { LedgerModule } from './ledger/ledger.module'
 import { ActivitiesModule } from './activities/activities.module'
 import { SupplyModule } from './supply/supply.module'
 import { HrModule } from './hr/hr.module'
+import { ReportsModule } from './reports/reports.module'
 import { PatientsModule } from './patients/patients.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { AttachmentsModule } from './attachments/attachments.module'
@@ -32,7 +33,7 @@ class HealthController {
 }
 
 @Module({
-  imports: [ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 300 }], skipIf: () => env().NODE_ENV === 'test' }), DbModule, AuthModule, OrgModule, BudgetModule, ApprovalsModule, LedgerModule, ActivitiesModule, SupplyModule, HrModule, PatientsModule, NotificationsModule, AttachmentsModule],
+  imports: [ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 300 }], skipIf: () => env().NODE_ENV === 'test' }), DbModule, AuthModule, OrgModule, BudgetModule, ApprovalsModule, LedgerModule, ActivitiesModule, SupplyModule, HrModule, PatientsModule, NotificationsModule, AttachmentsModule, ReportsModule],
   controllers: [HealthController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -222,6 +222,16 @@ Receipts, photos and PDFs can be attached to an activity, a field report, a spen
 - **Storage.** Files are stored once per content under `UPLOAD_DIR` (a docker volume), written then renamed so a half-written file is never visible. The compose file's backup service copies new files to `./backups/uploads` every day, next to the database dump. Downloads need the sign-in token, so the app fetches them and shows them from memory.
 - Files are not scanned for viruses; they are only ever shown as images or downloaded, never executed.
 
+### Monthly report to headquarters
+
+`GET reports/monthly?period=YYYY-MM` returns every number the report needs, computed from the ledger and the operational tables (nothing is typed in): money received and spent in the month, exchange gain or loss, each office's spending, activities, beneficiaries and month-close state, how many expenses are matched to a field report, approval volume and average decision time, each project and pillar against its ceiling (with how much of the project's time has passed), cash received and spent to date, open and overdue advances, mismatches between the technical and financial sides, in-kind supplies received and issued, staff, upcoming deadlines and next month's planned activities. Amounts are exact decimal strings in USD. A first-draft summary is written from the numbers in Arabic and English, and the author can edit it.
+
+- **Draft and approval.** `PUT reports/hq/:period/draft` keeps the summary, challenges and plan text. `POST reports/hq/:period/approve` is for the approver role chosen in the report settings (or a settings manager). Editing the text of an approved report sends it back to draft, so what is sent is what was approved.
+- **Delivery settings.** `GET/PUT report-settings` hold, for headquarters and for each project's donor, the recipients, copies, subject and text in both languages (with fields such as `{month}`, `{hq}`, `{org}`, `{sender}`, `{project}`, `{period}`, `{donor}`), whether approval is required and by which role, and which sections to include. `GET reports/delivery?kind=hq|donor&period=&projectId=&lang=` returns them with the fields filled in, ready to pre-fill the "Send by email" window.
+- **Send by email.** The app makes the PDF (it already draws Arabic correctly), uploads it as an attachment with owner type `report` and owner id `hq:2026-09` (or `donor:2026-09:<projectId>`), then calls `POST reports/send` with the file's id and the final recipients, subject and text. The server checks that the file is that report's PDF, that approval has been given when required, and that email is set up, then sends it through the configured email account. Every attempt, successful or failed, is kept in the sent log (`GET reports/sent`) with who sent it. A second click within a minute does not send twice; a failed send can be retried.
+- Reports cover the whole organisation, so office-limited accounts do not get them.
+- **Not done yet:** sending automatically on the chosen day (`autoSendDay` is saved but nothing acts on it), because making the PDF on the server needs a headless browser to draw Arabic well. Until then the person presses the button.
+
 ### Permissions
 
 Every route declares the module and access level it needs, e.g. `@Perm('finance', 'edit')`. On every request, the user and their role are reloaded from the database, so deactivating a user or changing a role takes effect immediately.
@@ -314,13 +324,18 @@ Errors look like `{ code, message: { ar, en }, details? }`, so the app can show 
 | | `POST notification-rules/run` | settings: manage |
 | | `GET deliveries`, `GET channels` | settings: view |
 | | `PUT channels/:channel`, `POST channels/:channel/test` (`email`, `whatsapp`, `sms`) | settings: manage |
+| Monthly report | `GET reports/monthly`, `GET reports/delivery`, `GET reports/sent`, `GET report-settings` | reports: view (whole-organisation accounts) |
+| | `PUT reports/hq/:period/draft`, `POST reports/send` | reports: edit |
+| | `POST reports/hq/:period/approve` | reports: edit and the approver role (or settings: manage) |
+| | `PUT report-settings` | settings: edit |
 | Attachments | `GET attachments?ownerType=&ownerId=`, `GET attachments/:id/file` (`?download=1`) | view access to the record's module |
 | | `POST attachments`, `DELETE attachments/:id` (own file, or module manager) | edit access to the record's module |
 
 ## Next phase
 
 These follow the same patterns as the modules above:
-- HQ report PDF and email sending
+- sending the HQ report automatically on a set day (needs a server-side PDF)
+- an Excel template for offline offices to fill in and upload field reports
 - connecting the React app to this API in place of its in-browser data
 
 The system accounts the ledger needs for stock and payroll (`inventory`, `inkind_revenue`, `salaries`, `payroll_deductions`) are already configured.

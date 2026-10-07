@@ -874,3 +874,53 @@ export const attachments = pgTable(
   },
   (t) => [index('attachments_owner_idx').on(t.ownerType, t.ownerId)],
 )
+
+// ─── Reports to headquarters and donors ──────────────────────────────────────
+
+/** One row (id 1): who each report goes to and the default subject and text. Edited from Settings. */
+export const reportSettings = pgTable('report_settings', {
+  id: integer('id').primaryKey().default(1),
+  hq: jsonb('hq').$type<Record<string, unknown>>().notNull(),
+  donor: jsonb('donor').$type<Record<string, unknown>>().notNull().default({}), // per project id
+  updatedById: text('updated_by_id').references(() => users.id),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
+export const draftStatus = pgEnum('draft_status', ['draft', 'approved', 'sent'])
+
+/** The narrative parts of a monthly report (summary, challenges, plan) and where it stands in approval. */
+export const hqDrafts = pgTable('hq_drafts', {
+  period: text('period').primaryKey(), // YYYY-MM
+  summary: jsonb('summary').$type<{ ar: string; en: string }>(),
+  challenges: jsonb('challenges').$type<{ ar: string; en: string }>(),
+  plan: jsonb('plan').$type<{ ar: string; en: string }>(),
+  status: draftStatus('status').notNull().default('draft'),
+  approvedById: text('approved_by_id').references(() => users.id),
+  approvedAt: ts('approved_at'),
+  updatedById: text('updated_by_id').references(() => users.id),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
+export const reportKind = pgEnum('report_kind', ['hq', 'donor'])
+export const sendStatus = pgEnum('send_status', ['sent', 'failed'])
+
+/** Every attempt to email a report, with what was sent and the PDF that went with it. */
+export const sentReports = pgTable(
+  'sent_reports',
+  {
+    id: id(),
+    kind: reportKind('kind').notNull(),
+    period: text('period').notNull(),
+    projectId: text('project_id').references(() => projects.id),
+    toAddresses: jsonb('to_addresses').$type<string[]>().notNull(),
+    ccAddresses: jsonb('cc_addresses').$type<string[]>().notNull().default([]),
+    subject: text('subject').notNull(),
+    body: text('body').notNull(),
+    attachmentId: text('attachment_id').references(() => attachments.id),
+    status: sendStatus('status').notNull(),
+    error: text('error'),
+    sentById: text('sent_by_id').references(() => users.id),
+    sentAt: ts('sent_at').notNull().defaultNow(),
+  },
+  (t) => [index('sent_reports_period_idx').on(t.kind, t.period)],
+)

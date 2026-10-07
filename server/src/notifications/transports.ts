@@ -7,6 +7,10 @@ export interface Message {
   subject: string
   body: string
   lang: 'ar' | 'en'
+  /** Email only: copies, files to attach, and whether this is an automatic message (false for one a person sent). */
+  cc?: string[]
+  attachments?: { filename: string; content: Buffer; contentType: string }[]
+  auto?: boolean
 }
 
 /** Sends one message. Throws with a short reason when it could not be sent. */
@@ -75,10 +79,12 @@ export class RealTransport implements Transport {
       await t.sendMail({
         from: c.fromName ? { name: c.fromName, address: c.fromAddress } : c.fromAddress,
         to: m.to,
+        cc: m.cc?.length ? m.cc : undefined,
         replyTo: c.replyTo || undefined,
         subject: m.subject,
         text: m.body,
-        headers: { 'X-Auto-Response-Suppress': 'All', 'Auto-Submitted': 'auto-generated' },
+        attachments: m.attachments,
+        headers: m.auto === false ? undefined : { 'X-Auto-Response-Suppress': 'All', 'Auto-Submitted': 'auto-generated' },
       })
     } finally {
       t.close()

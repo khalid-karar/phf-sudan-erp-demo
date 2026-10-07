@@ -8,6 +8,6 @@ import { TRANSPORT, transportProvider } from './transports'
 @Module({
   controllers: [NotificationsController],
   providers: [{ provide: TRANSPORT, useFactory: transportProvider }, NotificationEngine, NotificationsService],
-  exports: [NotificationEngine],
+  exports: [NotificationEngine, TRANSPORT],
 })
 export class NotificationsModule {}
