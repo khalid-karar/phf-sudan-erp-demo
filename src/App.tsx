@@ -33,6 +33,7 @@ import { Beneficiaries, PatientStats } from './pages/patients/Patients'
 import { Issues, Items, Receipts, Stock } from './pages/supply/Supply'
 import { Fleet, Shipments } from './pages/supply/Logistics'
 import { DonorReport } from './pages/reports/DonorReport'
+import { ExpenditureReport } from './pages/reports/ExpenditureReport'
 import { HqReport } from './pages/reports/HqReport'
 import { SentReports } from './pages/reports/SentReports'
 import { ReportSettings } from './pages/settings/ReportSettings'
@@ -72,6 +73,7 @@ const routes: [string, React.ReactNode][] = [
   ['/settings/reports', <ReportSettings />],
   ['/reports/hq', <HqReport />],
   ['/reports/donor', <DonorReport />],
+  ['/reports/expenditure', <ExpenditureReport />],
   ['/reports/sent', <SentReports />],
   ['/supply', <Stock />],
   ['/supply/receipts', <Receipts />],

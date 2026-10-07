@@ -285,6 +285,15 @@ const rows: Row[] = [
     ['Choose the project and period.', 'Export to PDF to attach to your narrative donor report.'],
   ],
   [
+    '/reports/expenditure',
+    'تقرير المصروفات الربع سنوي',
+    'Quarterly expenditure report',
+    'نموذج المانح التفصيلي للمصروفات: كل معاملة بنشاطها ورمز التمويل وفئة المصروف والحساب، المصرَّح به مقابل الفعلي.',
+    'The donor’s detailed expenditure template: every transaction with activity, fund code, expense category and account, authorized against actual.',
+    ['اختر المشروع والربع والعملة (جنيه أو دولار).', 'راجع الجدول ثم «تنزيل Excel» بنفس تنسيق نموذج المانح.', 'لتظهر رموز الأنشطة والتمويل، أنشئ المشروع بـ «استيراد من ملف المانح».'],
+    ['Pick the project, quarter and currency (SDG or USD).', 'Check the table, then “Download Excel” in the donor’s template format.', 'To get activity IDs and fund codes, create the project with “Import donor budget”.'],
+  ],
+  [
     '/reports/sent',
     'سجل الإرسال',
     'Sent reports',
