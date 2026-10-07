@@ -163,6 +163,8 @@ export const projects = pgTable('projects', {
   startDate: date('start_date').notNull(),
   endDate: date('end_date').notNull(),
   ceilingUsd: usd('ceiling_usd').notNull(),
+  ipCode: text('ip_code'), // the donor's implementing-partner code (e.g. PN6025)
+  budgetRate: rate('budget_rate'), // SDG per USD the donor budget was drawn at
   /** hard: anything over a ceiling is blocked. soft: up to tolerance_pct over, with the Executive Director added. */
   controlMode: controlMode('control_mode').notNull().default('hard'),
   tolerancePct: numeric('tolerance_pct', { precision: 5, scale: 2 }).notNull().default('0'),
@@ -213,6 +215,17 @@ export const budgetLines = pgTable(
     nameEn: text('name_en').notNull(),
     ceilingUsd: usd('ceiling_usd').notNull(),
     expenseAccountCode: text('expense_account_code').references(() => accounts.code), // charged when the line is spent
+    // Donor budget details (set by the budget-file import; used by the quarterly expenditure report)
+    activityCode: text('activity_code'),
+    fundCode: text('fund_code'),
+    state: text('state'),
+    description: text('description'),
+    unit: text('unit'),
+    unitQty: numeric('unit_qty', { precision: 14, scale: 2 }),
+    duration: numeric('duration', { precision: 14, scale: 2 }),
+    unitCostUsd: usd('unit_cost_usd'),
+    nature: text('nature'), // donor "nature of transaction" (expense category)
+    donorAccount: text('donor_account'), // donor monitoring account code (e.g. 75700)
     active: boolean('active').notNull().default(true),
     sort: integer('sort').notNull().default(0),
   },
@@ -855,7 +868,7 @@ export const channelSettings = pgTable('channel_settings', {
 // ─── Attachments ─────────────────────────────────────────────────────────────
 // Files live on disk (UPLOAD_DIR/<first two hex of sha256>/<sha256>); this table says what each one is and who may see it.
 
-export const attachmentOwner = pgEnum('attachment_owner', ['activity', 'field_report', 'spend_request', 'voucher', 'advance', 'report'])
+export const attachmentOwner = pgEnum('attachment_owner', ['activity', 'field_report', 'spend_request', 'voucher', 'advance', 'report', 'project'])
 
 export const attachments = pgTable(
   'attachments',

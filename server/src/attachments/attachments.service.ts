@@ -10,14 +10,14 @@ import { DB } from '../db/db.module'
 import { activities, advances, attachments, fieldReports, spendRequests, vouchers } from '../db/schema'
 import { cleanName, openBlob, sha256, sniff, storeBlob } from './files'
 
-export const OWNER_TYPES = ['activity', 'field_report', 'spend_request', 'voucher', 'advance', 'report'] as const
+export const OWNER_TYPES = ['activity', 'field_report', 'spend_request', 'voucher', 'advance', 'report', 'project'] as const
 export type OwnerType = (typeof OWNER_TYPES)[number]
 
 export const ownerQuery = z.object({ ownerType: z.enum(OWNER_TYPES), ownerId: z.string().min(1).max(64) })
 export const uploadFields = z.object({ ownerType: z.enum(OWNER_TYPES), ownerId: z.string().min(1).max(64), note: z.string().trim().max(300).optional() })
 
 const MAX_PER_RECORD = 50
-const MODULE: Record<OwnerType, ModuleKey> = { activity: 'activities', field_report: 'activities', spend_request: 'projects', voucher: 'finance', advance: 'finance', report: 'reports' }
+const MODULE: Record<OwnerType, ModuleKey> = { activity: 'activities', field_report: 'activities', spend_request: 'projects', voucher: 'finance', advance: 'finance', report: 'reports', project: 'projects' }
 
 @Injectable()
 export class AttachmentsService {
@@ -42,6 +42,7 @@ export class AttachmentsService {
       case 'advance':
         return one(db.select({ officeId: advances.officeId }).from(advances).where(eq(advances.id, id)))
       case 'report':
+      case 'project':
         return null
     }
   }

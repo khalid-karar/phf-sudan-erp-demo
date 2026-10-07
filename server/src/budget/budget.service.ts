@@ -9,6 +9,7 @@ import { DB } from '../db/db.module'
 import { accounts, activities, budgetLines, pillars, projects } from '../db/schema'
 import { fromCents, sumCents, toCents } from '../lib/money'
 import type { controlBody, linePatch, projectBody } from './budget.schemas'
+import { natureByName } from './natures'
 import { checkCeiling, checkJson, projectUsage, usageJson } from './usage'
 
 /** Serialises budget changes for one project (requests, reallocations, ceiling edits). */
@@ -129,6 +130,8 @@ export class BudgetService {
         startDate: b.startDate,
         endDate: b.endDate,
         ceilingUsd: b.ceilingUsd,
+        ipCode: b.ipCode ?? null,
+        budgetRate: b.budgetRate != null ? String(b.budgetRate) : null,
         controlMode: b.controlMode,
         tolerancePct: String(b.tolerancePct),
       })
@@ -145,6 +148,16 @@ export class BudgetService {
             nameEn: l.nameEn,
             ceilingUsd: l.ceilingUsd,
             expenseAccountCode: l.expenseAccountCode ?? null,
+            activityCode: l.detail?.activityCode ?? null,
+            fundCode: l.detail?.fundCode ?? null,
+            state: l.detail?.state ?? null,
+            description: l.detail?.description ?? null,
+            unit: l.detail?.unit ?? null,
+            unitQty: l.detail?.unitQty != null ? String(l.detail.unitQty) : null,
+            duration: l.detail?.duration != null ? String(l.detail.duration) : null,
+            unitCostUsd: l.detail?.unitCostUsd ?? null,
+            nature: l.detail?.nature ?? null,
+            donorAccount: l.detail?.donorAccount ?? null,
             sort: j,
           })),
         )
@@ -181,7 +194,14 @@ export class BudgetService {
         if (newCeiling < used)
           throw unprocessable('CEILING_BELOW_USED', { ar: 'السقف الجديد أقل مما صُرف أو حُجز على البند', en: 'The new ceiling is below what is already spent or reserved' }, { used: fromCents(used) })
       }
-      const [row] = await tx.update(budgetLines).set(b).where(eq(budgetLines.id, lineId)).returning()
+      const patch: Record<string, unknown> = { ...b }
+      if (b.nature !== undefined) {
+        const n = natureByName(b.nature)
+        if (b.nature && !n) throw unprocessable('BAD_NATURE', { ar: 'نوع المعاملة غير معروف', en: 'Unknown nature of transaction' })
+        patch.nature = n?.name ?? null
+        patch.donorAccount = n?.account ?? null
+      }
+      const [row] = await tx.update(budgetLines).set(patch).where(eq(budgetLines.id, lineId)).returning()
       await audit(tx, user, 'line.update', 'budget_line', lineId, b)
       return row
     })

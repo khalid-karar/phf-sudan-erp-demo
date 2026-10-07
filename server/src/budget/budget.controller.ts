@@ -1,14 +1,43 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post } from '@nestjs/common'
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UploadedFile, UseInterceptors } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { memoryStorage } from 'multer'
 import type { z } from 'zod'
 import type { AuthUser } from '../auth/auth-user'
 import { CurrentUser, Perm } from '../auth/decorators'
 import { Zod } from '../common/zod'
 import { checkBody, controlBody, linkBody, linePatch, projectBody } from './budget.schemas'
 import { BudgetService } from './budget.service'
+import { IceService, iceFields } from './ice.service'
+import { NATURES } from './natures'
 
 @Controller('projects')
 export class BudgetController {
-  constructor(private readonly budget: BudgetService) {}
+  constructor(
+    private readonly budget: BudgetService,
+    private readonly ice: IceService,
+  ) {}
+
+  /** Reads a donor budget file and says what it would create. Nothing is saved. */
+  @Perm('projects', 'manage')
+  @Post('import/preview')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
+  importPreview(@UploadedFile() file: { buffer: Buffer } | undefined) {
+    return this.ice.preview(file)
+  }
+
+  /** Creates the project, its activities and budget lines from a donor budget file, and keeps the file with the project. */
+  @Perm('projects', 'manage')
+  @Post('import')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
+  importFile(@CurrentUser() u: AuthUser, @UploadedFile() file: { buffer: Buffer; originalname?: string } | undefined, @Body(new Zod(iceFields)) b: z.infer<typeof iceFields>) {
+    return this.ice.import(u, file, b)
+  }
+
+  @Perm('projects', 'view')
+  @Get('natures')
+  natures() {
+    return NATURES
+  }
 
   @Perm('projects', 'view')
   @Get()
