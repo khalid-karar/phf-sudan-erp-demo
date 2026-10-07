@@ -355,6 +355,61 @@ Object.assign(liveActions, {
   },
 })
 
+// Reports: settings, the narrative parts of the HQ report, approval, and sending the PDF by email.
+const draftTimers = new Map<string, ReturnType<typeof setTimeout>>()
+Object.assign(liveActions, {
+  setReportSettings: (r: import('../data/types').ReportSettings) => act(() => api.put('/report-settings', r), { ok: { ar: 'حُفظت إعدادات إرسال التقارير', en: 'Report delivery settings saved' } }),
+
+  saveHqDraft: (period: string, patch: Partial<import('../data/types').HqDraft>) => {
+    if (patch.status === 'approved') {
+      clearTimeout(draftTimers.get(period))
+      return act(() => api.post(`/reports/hq/${period}/approve`), { ok: { ar: 'اعتُمد التقرير', en: 'Report approved' } }).then((ok) => {
+        if (ok) void import('./monthly').then(() => window.dispatchEvent(new CustomEvent('phf:report-changed', { detail: period })))
+        return ok
+      })
+    }
+    // Typing shows at once; the server gets the text a moment after the person stops, and an approved report goes back to draft there.
+    const bi = (b: import('../data/types').Bi | undefined) => (b === undefined ? null : { ar: b.ar ?? '', en: b.en ?? '' })
+    useStore.setState((st) => {
+      const cur = st.hqDrafts.find((d) => d.period === period) ?? { period, status: 'draft' as const }
+      return { hqDrafts: [...st.hqDrafts.filter((d) => d.period !== period), { ...cur, ...patch, ...(('summary' in patch || 'challenges' in patch || 'plan' in patch) ? { status: 'draft' as const, approvedBy: undefined } : {}) }] }
+    })
+    const cur = useStore.getState().hqDrafts.find((d) => d.period === period)!
+    clearTimeout(draftTimers.get(period))
+    draftTimers.set(
+      period,
+      setTimeout(async () => {
+        draftTimers.delete(period)
+        try {
+          await api.put(`/reports/hq/${period}/draft`, { summary: bi(cur.summary), challenges: bi(cur.challenges), plan: bi(cur.plan) })
+        } catch (e) {
+          useStore.getState().toast(errorText(e), 'bad')
+        }
+        window.dispatchEvent(new CustomEvent('phf:report-changed', { detail: period }))
+      }, 800),
+    )
+  },
+
+  // The PDF is uploaded first, then the server emails it and logs the send.
+  recordSent: async (r: Omit<import('../data/types').SentReport, 'id' | 'at' | 'by'> & { body?: string; blob?: Blob }) => {
+    if (!r.blob) {
+      useStore.getState().toast({ ar: 'لا يوجد ملف PDF لإرساله', en: 'There is no PDF to send' }, 'bad')
+      return false
+    }
+    const key = r.kind === 'hq' ? `hq:${r.period}` : `donor:${r.period}:${r.projectId}`
+    const ok = await act(async () => {
+      const f = new FormData()
+      f.append('ownerType', 'report')
+      f.append('ownerId', key)
+      f.append('file', r.blob!, r.fileName)
+      const att = await api.upload<{ id: string }>('/attachments', f)
+      await api.post('/reports/send', { kind: r.kind, period: r.period, projectId: r.projectId, attachmentId: att.id, to: r.to, cc: r.cc, subject: r.subject, body: r.body || r.subject })
+    }, { ok: { ar: `أُرسل «${r.title.ar}»`, en: `“${r.title.en}” sent` } })
+    if (ok) window.dispatchEvent(new CustomEvent('phf:report-changed', { detail: r.period }))
+    return ok
+  },
+})
+
 let syncing = false
 
 /** One report to the server: the same report sent twice is filed once (the device id is the activity's), then its photos. */

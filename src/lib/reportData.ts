@@ -73,7 +73,7 @@ export function monthlyData(s: S, period: string) {
   const cashFund = { received: s.vouchers.filter((v) => v.kind === 'receipt').reduce((t, v) => t + v.amountUSD, 0), spent: s.expenses.reduce((t, e) => t + e.amountUSD, 0) }
   const openAdv = s.advances.filter((a) => a.status === 'open')
   const overdueAdv = openAdv.filter((a) => +new Date(a.dueAt) < Date.now())
-  const gaps = matchingGaps(s)
+  const gapCount = matchingGaps(s).length
 
   // In-kind supplies and staff (filled once those modules hold data).
   const x = s as unknown as {
@@ -88,8 +88,17 @@ export function monthlyData(s: S, period: string) {
     : null
   const staff = x.employees ? { total: x.employees.filter((e) => e.status === 'active').length, offices: new Set(x.employees.map((e) => e.officeId)).size } : null
 
-  const upcoming = s.deadlines.filter((d) => !d.done && +new Date(d.due) > +end).sort((a, b) => +new Date(a.due) - +new Date(b.due)).slice(0, 5)
-  const plannedNext = s.activities.filter((a) => !a.report && +new Date(a.date) > +end).sort((a, b) => +new Date(a.date) - +new Date(b.date)).slice(0, 6)
+  const upcoming = s.deadlines
+    .filter((d) => !d.done && +new Date(d.due) > +end)
+    .sort((a, b) => +new Date(a.due) - +new Date(b.due))
+    .slice(0, 5)
+    .map((d) => ({ id: d.id, due: d.due, title: d.title }))
+  const plannedNext = s.activities
+    .filter((a) => !a.report && +new Date(a.date) > +end)
+    .sort((a, b) => +new Date(a.date) - +new Date(b.date))
+    .slice(0, 6)
+    .map((a) => ({ id: a.id, date: a.date, title: a.title }))
+  const highlights = doneActs.slice(0, 6).map((a) => ({ id: a.id, title: a.title, summary: a.report!.summary }))
 
   return {
     period,
@@ -97,22 +106,24 @@ export function monthlyData(s: S, period: string) {
     end,
     rate,
     received,
-    receipts,
+    receiptCount: receipts.length,
     spent,
     fx,
     byOffice,
-    doneActs,
+    doneCount: doneActs.length,
+    highlights,
     people,
     beneficiaries,
     compliance,
-    reqs,
-    decided,
+    reqCount: reqs.length,
+    decidedCount: decided.length,
     avgApprovalHours,
     projects,
     cashFund,
-    openAdv,
-    overdueAdv,
-    gaps,
+    openAdvTotal: openAdv.reduce((a, x) => a + x.amountUSD, 0),
+    overdueAdvCount: overdueAdv.length,
+    overdueAdvTotal: overdueAdv.reduce((a, x) => a + x.amountUSD, 0),
+    gapCount,
     inKind,
     staff,
     upcoming,
@@ -122,12 +133,13 @@ export function monthlyData(s: S, period: string) {
 
 export type MonthlyData = ReturnType<typeof monthlyData>
 
+
 export function autoSummary(d: MonthlyData, ar: boolean) {
   const pct = Math.round(d.compliance * 100)
   const money = (v: number) => `$${Math.round(v).toLocaleString('en-US')}`
   return ar
-    ? `خلال الشهر نفّذ المكتب ${d.doneActs.length} نشاطاً ميدانياً استفاد منها ${d.beneficiaries.toLocaleString('en-US')} شخصاً في ${d.byOffice.filter((o) => o.activities > 0).length} ولايات. بلغ الصرف ${money(d.spent)}، ووردت منح وتبرعات بقيمة ${money(d.received)}. نسبة المصروفات المطابقة بتقارير فنية ${pct}٪.`
-    : `During the month the office carried out ${d.doneActs.length} field activities reaching ${d.beneficiaries.toLocaleString('en-US')} people in ${d.byOffice.filter((o) => o.activities > 0).length} states. Spending was ${money(d.spent)} and ${money(d.received)} of grants and donations were received. ${pct}% of expenses are matched to field reports.`
+    ? `خلال الشهر نفّذ المكتب ${d.doneCount} نشاطاً ميدانياً استفاد منها ${d.beneficiaries.toLocaleString('en-US')} شخصاً في ${d.byOffice.filter((o) => o.activities > 0).length} ولايات. بلغ الصرف ${money(d.spent)}، ووردت منح وتبرعات بقيمة ${money(d.received)}. نسبة المصروفات المطابقة بتقارير فنية ${pct}٪.`
+    : `During the month the office carried out ${d.doneCount} field activities reaching ${d.beneficiaries.toLocaleString('en-US')} people in ${d.byOffice.filter((o) => o.activities > 0).length} states. Spending was ${money(d.spent)} and ${money(d.received)} of grants and donations were received. ${pct}% of expenses are matched to field reports.`
 }
 
 export const defaultChallenges = {

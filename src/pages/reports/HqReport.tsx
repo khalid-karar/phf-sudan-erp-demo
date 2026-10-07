@@ -1,5 +1,7 @@
 import { Check, Download, Loader2, Mail, RotateCcw, Stamp } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { LIVE } from '../../api/http'
+import { fromServer, useServerMonthly } from '../../api/monthly'
 import { FitPreview } from '../../components/report/FitPreview'
 import { DocHeader, HqReportDoc } from '../../components/report/HqReportDoc'
 import { SendModal } from '../../components/report/SendModal'
@@ -21,7 +23,15 @@ export function HqReport() {
   const [sending, setSending] = useState(false)
   const docRef = useRef<HTMLDivElement>(null)
   const headRef = useRef<HTMLDivElement>(null)
-  const d = useMemo(() => monthlyData(s, period), [s, period])
+  const live = useServerMonthly(period, LIVE)
+  useEffect(() => {
+    if (!LIVE) return
+    const on = (e: Event) => (e as CustomEvent).detail === period && void live.reload()
+    window.addEventListener('phf:report-changed', on)
+    return () => window.removeEventListener('phf:report-changed', on)
+  }, [period, live])
+  const local = useMemo(() => (LIVE ? null : monthlyData(s, period)), [s, period])
+  const d = useMemo(() => local ?? (live.sv ? fromServer(live.sv, s) : null), [local, live.sv, s])
   const draft = s.hqDrafts.find((x) => x.period === period)
   const st = s.reportSettings.hq
   const status = draft?.status ?? 'draft'
@@ -60,6 +70,13 @@ export function HqReport() {
     { k: 'sent', l: ar ? 'مُرسل' : 'Sent' },
   ]
   const idx = steps.findIndex((x) => x.k === status)
+
+  if (!d)
+    return (
+      <div className="flex items-center gap-2 p-10 text-muted">
+        {live.error ? (ar ? 'تعذّر تحميل التقرير' : 'The report could not be loaded') : <><Loader2 size={18} className="animate-spin" /> {ar ? 'جارٍ إعداد التقرير…' : 'Preparing the report…'}</>}
+      </div>
+    )
 
   return (
     <div>

@@ -111,7 +111,7 @@ export function HqReportDoc({
         <div className="grid grid-cols-5 divide-x divide-line overflow-hidden rounded-md border border-line rtl:divide-x-reverse">
           {(
             [
-              [t('أنشطة منفذة', 'Activities done'), n0(d.doneActs.length)],
+              [t('أنشطة منفذة', 'Activities done'), n0(d.doneCount)],
               [t('المستفيدون', 'Beneficiaries'), n0(d.beneficiaries)],
               [t('الصرف خلال الشهر', 'Spent in month'), usd(d.spent)],
               [t('المنح الواردة', 'Grants received'), usd(d.received)],
@@ -161,7 +161,7 @@ export function HqReportDoc({
               <tr>
                 <td className="px-2 py-1.5">{t('عهد مفتوحة لدى الموظفين', 'Open staff advances')}</td>
                 <td className="px-2 py-1.5 text-end text-muted">—</td>
-                <td className="num px-2 py-1.5 text-end">{usd(d.openAdv.reduce((a, x) => a + x.amountUSD, 0))}</td>
+                <td className="num px-2 py-1.5 text-end">{usd(d.openAdvTotal)}</td>
               </tr>
               {d.inKind && sec('supply') && (
                 <tr>
@@ -296,13 +296,13 @@ export function HqReportDoc({
                 ))}
             </tbody>
           </table>
-          {d.doneActs.length > 0 && (
+          {d.highlights.length > 0 && (
             <div className="mt-3">
               <div className="mb-1 text-[11.5px] font-semibold">{t('أبرز الأنشطة', 'Highlights')}</div>
               <ul className="space-y-0.5 text-[11.5px]">
-                {d.doneActs.slice(0, 6).map((a) => (
+                {d.highlights.map((a) => (
                   <li key={a.id}>
-                    • <b>{a.title[lang]}</b> — {a.report?.summary[lang]}
+                    • <b>{a.title[lang]}</b> — {a.summary[lang]}
                   </li>
                 ))}
               </ul>
@@ -319,9 +319,9 @@ export function HqReportDoc({
               {(
                 [
                   [t('المصروفات المطابقة بتقارير فنية', 'Expenses matched to field reports'), pct(d.compliance)],
-                  [t('فجوات مطابقة قائمة', 'Open matching gaps'), n0(d.gaps.length)],
-                  [t('عهد متأخرة عن التسوية', 'Advances past settlement date'), `${d.overdueAdv.length} (${usd(d.overdueAdv.reduce((a, x) => a + x.amountUSD, 0))})`],
-                  [t('طلبات صرف جديدة / بُتّ فيها', 'Spend requests new / decided'), `${d.reqs.length} / ${d.decided.length}`],
+                  [t('فجوات مطابقة قائمة', 'Open matching gaps'), n0(d.gapCount)],
+                  [t('عهد متأخرة عن التسوية', 'Advances past settlement date'), `${d.overdueAdvCount} (${usd(d.overdueAdvTotal)})`],
+                  [t('طلبات صرف جديدة / بُتّ فيها', 'Spend requests new / decided'), `${d.reqCount} / ${d.decidedCount}`],
                   [t('متوسط زمن الاعتماد', 'Average approval time'), d.avgApprovalHours === null ? '—' : t(`${Math.round(d.avgApprovalHours)} ساعة`, `${Math.round(d.avgApprovalHours)} hours`)],
                   [t('مكاتب أقفلت الشهر', 'Offices that closed the month'), `${d.byOffice.filter((o) => o.closed).length} / ${d.byOffice.length}`],
                 ] as [string, string][]

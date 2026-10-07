@@ -52,7 +52,7 @@ export function SentReports() {
                     <div className="text-[12.5px] text-muted">{s.users.find((u) => u.id === r.by)?.name[lang]}</div>
                   </td>
                   <td className="num px-5 py-2.5 text-[12.5px] text-muted" dir="ltr">
-                    {r.fileName} ({r.sizeKB} KB)
+                    {r.fileName}{r.sizeKB > 0 && ` (${r.sizeKB} KB)`}
                   </td>
                 </tr>
               ))}

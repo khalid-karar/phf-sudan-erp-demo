@@ -129,9 +129,9 @@ interface State {
   reportSettings: ReportSettings
   hqDrafts: HqDraft[]
   sentReports: SentReport[]
-  setReportSettings: (r: ReportSettings) => void
+  setReportSettings: (r: ReportSettings) => void | Promise<boolean>
   saveHqDraft: (period: string, patch: Partial<HqDraft>) => void
-  recordSent: (r: Omit<SentReport, 'id' | 'at' | 'by'>) => void
+  recordSent: (r: Omit<SentReport, 'id' | 'at' | 'by'> & { body?: string; blob?: Blob }) => void | Promise<boolean>
 
   notifRules: NotifRule[]
   notifications: AppNotification[]

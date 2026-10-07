@@ -1,6 +1,6 @@
 // Fills the app's data from the API after sign-in. What a person's role cannot open comes back empty,
 // not as an error: a storekeeper has no finance data to load and does not need it.
-import type { ChannelConfig, HqDraft, ReportSettings, SentReport } from '../data/types'
+import type { ChannelConfig, ReportSettings, SentReport } from '../data/types'
 import { defaultChannels } from '../lib/notify'
 import { api, ApiError } from './http'
 import type * as T from './dto'
@@ -92,7 +92,11 @@ export async function loadData(userId: string, perms: Record<string, string>) {
   for (const p of trees) for (const pl of p.pillars) for (const l of pl.lines) if (l.expenseAccountCode) lineMap[l.id] = l.expenseAccountCode
 
   const closes = close.map((c) => ({ officeId: c.officeId, cashCounted: c.checks.cashCounted, closedAt: c.closedAt ?? undefined, closedBy: undefined }))
-  const sentReports: SentReport[] = sent.map((r) => ({ id: r.id, kind: r.kind, title: { ar: r.subject, en: r.subject }, period: r.period, projectId: r.projectId ?? undefined, to: r.toAddresses, cc: r.ccAddresses, subject: r.subject, fileName: '', sizeKB: 0, at: r.sentAt, by: r.sentById ?? '' }))
+  const sentReports: SentReport[] = sent.map((r) => {
+    const proj = r.projectId ? trees.find((p) => p.id === r.projectId)?.code : undefined
+    const title = r.kind === 'hq' ? { ar: `التقرير الشهري — ${r.period}`, en: `Monthly report — ${r.period}` } : { ar: `تقرير المانح — ${proj ?? ''} ${r.period}`, en: `Donor report — ${proj ?? ''} ${r.period}` }
+    return { id: r.id, kind: r.kind, title, period: r.period, projectId: r.projectId ?? undefined, to: r.toAddresses, cc: r.ccAddresses, subject: r.subject, fileName: r.kind === 'hq' ? `PHF-Sudan-monthly-report-${r.period}.pdf` : `PHF-donor-report-${proj ?? ''}-${r.period}.pdf`, sizeKB: 0, at: r.sentAt, by: r.sentById ?? '' }
+  })
   void deliveries
 
   return {
@@ -124,7 +128,6 @@ export async function loadData(userId: string, perms: Record<string, string>) {
     deliveries: deliveries.map(M.mapDelivery),
     channels: (channels ? mergeChannels(channels) : defaultChannels) as ChannelConfig,
     reportSettings: reportSettings ?? undefined,
-    hqDrafts: [] as HqDraft[],
     sentReports,
   }
 }

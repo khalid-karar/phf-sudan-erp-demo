@@ -52,7 +52,7 @@ export function SendModal({
   defaults: ReportDelivery
   vars: Record<string, string>
   makePdf: () => Promise<{ blob: Blob; sizeKB: number; fileName: string }>
-  onSent: (r: { to: string[]; cc: string[]; subject: string; fileName: string; sizeKB: number }) => void
+  onSent: (r: { to: string[]; cc: string[]; subject: string; fileName: string; sizeKB: number; body: string; blob: Blob }) => void | Promise<boolean>
   onClose: () => void
 }) {
   const lang = useLang()
@@ -62,10 +62,11 @@ export function SendModal({
   const [cc, setCc] = useState(defaults.cc)
   const [subject, setSubject] = useState(fill(defaults.subject[lang], vars))
   const [body, setBody] = useState(fill(defaults.body[lang], vars))
-  const [pdf, setPdf] = useState<{ sizeKB: number; fileName: string } | null>(null)
+  const [pdf, setPdf] = useState<{ sizeKB: number; fileName: string; blob: Blob } | null>(null)
+  const [sending, setSending] = useState(false)
   useEffect(() => {
     let live = true
-    makePdf().then((p) => live && setPdf({ sizeKB: p.sizeKB, fileName: p.fileName }))
+    makePdf().then((p) => live && setPdf({ sizeKB: p.sizeKB, fileName: p.fileName, blob: p.blob }))
     return () => {
       live = false
     }
@@ -123,13 +124,15 @@ export function SendModal({
           {ar ? 'إلغاء' : 'Cancel'}
         </Button>
         <Button
-          disabled={!pdf || !to.length || !subject.trim()}
-          onClick={() => {
-            onSent({ to, cc, subject, fileName: pdf!.fileName, sizeKB: pdf!.sizeKB })
-            onClose()
+          disabled={!pdf || !to.length || !subject.trim() || sending}
+          onClick={async () => {
+            setSending(true)
+            const ok = await onSent({ to, cc, subject, body, fileName: pdf!.fileName, sizeKB: pdf!.sizeKB, blob: pdf!.blob })
+            setSending(false)
+            if (ok !== false) onClose()
           }}
         >
-          <Mail size={16} /> {ar ? 'إرسال' : 'Send'}
+          {sending ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />} {ar ? 'إرسال' : 'Send'}
         </Button>
       </div>
     </Modal>
