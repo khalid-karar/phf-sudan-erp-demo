@@ -176,8 +176,9 @@ export function ImportExcel() {
   }
 
   const good = rows?.filter((r) => !r.errors.length) ?? []
-  const importNow = () => {
-    s.importReports(
+  const importNow = async () => {
+    setBusy(true)
+    const all = await s.importReports(
       good.map((r) => ({
         activityId: r.activity!.id,
         report: {
@@ -195,7 +196,8 @@ export function ImportExcel() {
         } satisfies FieldReport,
       })),
     )
-    setRows(rows!.filter((r) => r.errors.length))
+    setBusy(false)
+    if (all !== false) setRows(rows!.filter((r) => r.errors.length))
   }
 
   return (

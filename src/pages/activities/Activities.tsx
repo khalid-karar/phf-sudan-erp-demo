@@ -175,13 +175,15 @@ export function ActivityModal({ onClose, initial }: { onClose: () => void; initi
   const project = s.projects.find((p) => p.id === d.projectId)!
   const lu = findLine(s.projects, d.lineId) ? lineUsage(findLine(s.projects, d.lineId)!.line, s) : null
   const valid = (d.title.ar || d.title.en).trim().length > 2
-  const save = (andRequest: boolean) => {
+  const save = async (andRequest: boolean) => {
     const office = s.offices.find((o) => o.id === d.officeId)!
     const prefix = office.id.toUpperCase().slice(0, 3)
     const n = s.activities.filter((a) => a.officeId === d.officeId).length + 140
     const code = d.code || `ACT-${prefix}-${String(n).padStart(4, '0')}`
-    const a = { ...d, id: d.id || `act-${Date.now().toString(36)}`, code, title: { ar: d.title.ar || d.title.en, en: d.title.en || d.title.ar }, createdBy: s.userId }
-    s.saveActivity(a)
+    const draft = { ...d, id: d.id || `act-${Date.now().toString(36)}`, code, title: { ar: d.title.ar || d.title.en, en: d.title.en || d.title.ar }, createdBy: s.userId }
+    const saved = await s.saveActivity(draft)
+    if (saved === null) return
+    const a = saved || draft
     onClose()
     if (andRequest) nav(`/requests/new?project=${a.projectId}&line=${a.lineId}&activity=${a.code}&amount=${a.plannedUSD ?? ''}`)
     else nav(`/activities/${a.id}`)

@@ -118,7 +118,7 @@ export function FieldReport() {
       { timeout: 8000 },
     )
   }
-  const submit = () => {
+  const submit = async () => {
     if (!act) return
     const report: Report = {
       no: `TR-${act.code.slice(4)}`,
@@ -137,7 +137,7 @@ export function FieldReport() {
       submittedBy: s.userId,
       via: online ? 'online' : 'offline',
     }
-    setDone(s.submitReport(act.id, report))
+    setDone(await s.submitReport(act.id, report))
   }
   const reset = () => {
     setDone(null)

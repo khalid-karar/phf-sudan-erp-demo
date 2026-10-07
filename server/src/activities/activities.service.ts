@@ -23,6 +23,8 @@ export const activityBody = z.object({
   inKind: z.boolean().default(false),
 })
 
+export const activityPatch = activityBody.omit({ code: true, officeId: true, lineId: true }).partial()
+
 export const reportBody = z.object({
   clientId: z.string().min(8).max(80).optional(), // device-generated id; re-sending the same report is safe
   doneOn: isoDate.optional(),
@@ -89,6 +91,19 @@ export class ActivitiesService {
         .returning()
       await audit(tx, user, 'activity.create', 'activity', a.id, { code })
       return a
+    })
+  }
+
+  /** Edits what was planned. The office and code never change; the budget line can't move once a report or spending exists. */
+  async update(user: AuthUser, id: string, b: z.infer<typeof activityPatch>) {
+    return this.db.transaction(async (tx) => {
+      const [a] = await tx.select().from(activities).where(eq(activities.id, id)).for('update')
+      if (!a) throw notFound({ ar: 'النشاط', en: 'Activity' })
+      const limited = scopeOffice(user)
+      if (limited && a.officeId !== limited) throw forbidden({ ar: 'النشاط لا يتبع مكتبك', en: 'This activity belongs to another office' })
+      const [row] = await tx.update(activities).set(b).where(eq(activities.id, id)).returning()
+      await audit(tx, user, 'activity.update', 'activity', id, { fields: Object.keys(b) })
+      return row
     })
   }
 

@@ -151,12 +151,12 @@ interface State {
   outbox: OutboxItem[]
   offlineSim: boolean
 
-  saveActivity: (a: FieldActivity) => void
-  submitReport: (activityId: string, report: FieldReport) => 'sent' | 'queued'
+  saveActivity: (a: FieldActivity) => void | FieldActivity | null | Promise<FieldActivity | null>
+  submitReport: (activityId: string, report: FieldReport) => 'sent' | 'queued' | null | Promise<'sent' | 'queued' | null>
   setOfflineSim: (v: boolean) => void
-  syncOutbox: () => void
-  linkExpense: (expenseId: string, activityCode: string) => void
-  importReports: (rows: { activityId: string; report: FieldReport }[]) => void
+  syncOutbox: () => void | Promise<void>
+  linkExpense: (expenseId: string, activityCode: string) => void | Promise<boolean>
+  importReports: (rows: { activityId: string; report: FieldReport }[]) => void | Promise<boolean>
   gapCount: () => number
 
   setOrg: (patch: Partial<OrgSettings>) => void | Promise<boolean>
@@ -1137,7 +1137,7 @@ export const useStore = create<State>()(
       void _t
       void _o
       // Live mode keeps only screen preferences here; the data always comes from the server.
-      if (LIVE) return { lang: s.lang, sidebarCollapsed: s.sidebarCollapsed, tourSeen: s.tourSeen, visited: s.visited, checklistHidden: s.checklistHidden } as typeof rest
+      if (LIVE) return { outbox: s.outbox, lang: s.lang, sidebarCollapsed: s.sidebarCollapsed, tourSeen: s.tourSeen, visited: s.visited, checklistHidden: s.checklistHidden } as typeof rest
       return rest
     },
   },

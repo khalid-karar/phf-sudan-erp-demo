@@ -68,7 +68,12 @@ const LOCAL = new Set(['startTour', 'endTour', 'markVisited', 'hideChecklist', '
 export const WIRED = new Set<string>(Object.keys(liveActions))
 
 /** Until a screen's action is connected, it says so instead of changing only the local copy that the next refresh would erase. */
+let listening = false
 export function guardUnwired() {
+  if (!listening) {
+    listening = true
+    window.addEventListener('online', () => void useStore.getState().syncOutbox())
+  }
   const st = useStore.getState() as unknown as Record<string, unknown>
   const stubs: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(st)) {

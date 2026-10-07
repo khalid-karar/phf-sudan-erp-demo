@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import type { Response } from 'express'
 import { memoryStorage } from 'multer'
@@ -7,7 +7,7 @@ import type { AuthUser } from '../auth/auth-user'
 import { CurrentUser, Perm } from '../auth/decorators'
 import { Zod } from '../common/zod'
 import { ExcelService } from './excel.service'
-import { ActivitiesService, activityBody, activityQuery, reportBody } from './activities.service'
+import { ActivitiesService, activityBody, activityPatch, activityQuery, reportBody } from './activities.service'
 
 @Controller('activities')
 export class ActivitiesController {
@@ -57,6 +57,12 @@ export class ActivitiesController {
   @Post()
   create(@CurrentUser() u: AuthUser, @Body(new Zod(activityBody)) b: z.infer<typeof activityBody>) {
     return this.svc.create(u, b)
+  }
+
+  @Perm('activities', 'edit')
+  @Patch(':id')
+  update(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new Zod(activityPatch)) b: z.infer<typeof activityPatch>) {
+    return this.svc.update(u, id, b)
   }
 
   @Perm('activities', 'edit')

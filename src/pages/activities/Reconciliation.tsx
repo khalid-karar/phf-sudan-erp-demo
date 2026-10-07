@@ -273,8 +273,8 @@ function LinkModal({ gap, onClose }: { gap: Gap; onClose: () => void }) {
       {!isExpense && act && (
         <button
           className="mt-3 text-[13.5px] text-nile hover:underline"
-          onClick={() => {
-            s.saveActivity({ ...act, inKind: true })
+          onClick={async () => {
+            if ((await s.saveActivity({ ...act, inKind: true })) === null) return
             onClose()
           }}
         >
@@ -287,9 +287,9 @@ function LinkModal({ gap, onClose }: { gap: Gap; onClose: () => void }) {
         </Button>
         <Button
           disabled={!pick}
-          onClick={() => {
-            if (isExpense) s.linkExpense((gap as Extract<Gap, { kind: 'spend_no_report' }>).expenseId, pick)
-            else if (act) s.linkExpense(pick, act.code)
+          onClick={async () => {
+            const r = isExpense ? await s.linkExpense((gap as Extract<Gap, { kind: 'spend_no_report' }>).expenseId, pick) : act ? await s.linkExpense(pick, act.code) : undefined
+            if (r === false) return
             onClose()
           }}
         >

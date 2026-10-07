@@ -96,3 +96,14 @@ describe('linking spending to an activity', () => {
     expect(again.body.code).toBe('ALREADY_LINKED')
   })
 })
+
+describe('editing a planned activity', () => {
+  it('changes what was planned, for your own office only', async () => {
+    const mine = ((await fo.get('/activities?limit=500')).body as { id: string; officeId: string }[])[0]
+    const ok = await fo.patch(`/activities/${mine.id}`, { inKind: true, location: 'Wad Sharifey' })
+    expect(ok.status).toBe(200)
+    expect(ok.body.inKind).toBe(true)
+    const other = ((await admin.get('/activities?limit=500')).body as { id: string; officeId: string }[]).find((a) => a.officeId !== mine.officeId)!
+    expect((await fo.patch(`/activities/${other.id}`, { inKind: true })).status).toBe(403)
+  })
+})
