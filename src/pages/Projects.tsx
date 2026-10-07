@@ -1,6 +1,8 @@
-import { ChevronDown, Lock, Plus, Shuffle, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, FileSpreadsheet, Lock, Plus, Shuffle, SlidersHorizontal } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ImportBudgetModal } from '../components/ImportBudgetModal'
+import { LIVE } from '../api/http'
 import { NewProjectModal } from '../components/NewProjectModal'
 import { ReallocationModal } from '../components/ReallocationModal'
 import { Button, PageHeader, Panel, StatusBadge, UsageBar, UsageLegend } from '../components/ui'
@@ -15,14 +17,22 @@ export function ProjectsList() {
   const ar = lang === 'ar'
   const { can } = usePerm()
   const [creating, setCreating] = useState(false)
+  const [importing, setImporting] = useState(false)
   return (
     <div>
       <PageHeader
         actions={
           can('projects', 'manage') && (
-            <Button onClick={() => setCreating(true)}>
-              <Plus size={16} /> {ar ? 'مشروع جديد' : 'New project'}
-            </Button>
+            <div className="flex gap-2">
+              {LIVE && (
+                <Button variant="quiet" onClick={() => setImporting(true)}>
+                  <FileSpreadsheet size={16} /> {ar ? 'استيراد من ملف المانح' : 'Import donor budget'}
+                </Button>
+              )}
+              <Button onClick={() => setCreating(true)}>
+                <Plus size={16} /> {ar ? 'مشروع جديد' : 'New project'}
+              </Button>
+            </div>
           )
         }
         title={ar ? 'المشاريع والميزانيات' : 'Projects & budgets'}
@@ -60,6 +70,7 @@ export function ProjectsList() {
         })}
       </div>
       {creating && <NewProjectModal onClose={() => setCreating(false)} />}
+      {importing && <ImportBudgetModal onClose={() => setImporting(false)} />}
     </div>
   )
 }

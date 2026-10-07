@@ -6,9 +6,11 @@ import { audit } from '../common/audit'
 import { unprocessable } from '../common/errors'
 import type { Db } from '../db/client'
 import { DB } from '../db/db.module'
-import { attachments } from '../db/schema'
+import { accounts, attachments } from '../db/schema'
+import { and, eq } from 'drizzle-orm'
 import { fromCents, toCents } from '../lib/money'
 import { BudgetService } from './budget.service'
+import { localAccount } from './natures'
 import { parseIce, type IceParsed } from './ice'
 import { isoDate } from '../common/zod'
 
@@ -103,6 +105,8 @@ export class IceService {
       }
       groups.get(l.activityCode)!.push(l)
     }
+    const usable = new Set((await this.db.select({ code: accounts.code }).from(accounts).where(and(eq(accounts.type, 'expense'), eq(accounts.postable, true)))).map((a) => a.code))
+    const fallback = usable.has('5299') ? '5299' : [...usable][0] ?? null
     let seq = 0
     let all = 0
     const pillars = order.map((code) => {
@@ -122,6 +126,7 @@ export class IceService {
             nameAr: name,
             nameEn: name,
             ceilingUsd: l.totalUsd,
+            expenseAccountCode: usable.has(localAccount(l.nature)) ? localAccount(l.nature) : fallback,
             detail: {
               activityCode: l.activityCode,
               fundCode: l.fundCode || null,

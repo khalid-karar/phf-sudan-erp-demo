@@ -55,3 +55,18 @@ export function guessNature(item: string): string | null {
   if (has('fuel')) return 'Purchase of fuel, petroleum and other oils'
   return null
 }
+
+/** The organisation's own expense account that a donor nature of transaction is booked to by default. */
+export function localAccount(nature: string | null): string {
+  const t = (nature ?? '').toLowerCase()
+  if (t.includes('cash voucher')) return '5101'
+  if (t.includes('salar') || t.includes('consultant')) return '5201'
+  if (t.includes('training') || t.includes('participation')) return '5103'
+  if (t.includes('medical') || t.includes('pharma') || t.includes('hygiene')) return '5102'
+  if (t.includes('office') || t.includes('printing')) return '5204'
+  if (t.includes('internet') || t.includes('telephon')) return '5203'
+  if (t.includes('rent')) return '5207'
+  if (t.includes('fuel') || t.includes('transport')) return '5202'
+  if (t.includes('bank')) return '5205'
+  return '5299'
+}

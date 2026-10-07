@@ -76,7 +76,7 @@ describe('donor budget file import', () => {
     expect(p).toMatchObject({ code: 'PN9999', ceilingUsd: '9261.00', ipCode: 'PN9999', budgetRate: '3350.0000' })
     expect(p.pillars.map((x: { code: string; ceilingUsd: string }) => [x.code, x.ceilingUsd])).toEqual([['GBVCAEPN9999', '8025.00'], ['RHOPCPN9999', '1236.00']])
     const l = p.pillars[0].lines[0]
-    expect(l).toMatchObject({ ceilingUsd: '2700.00', fundCode: 'EUB98', state: 'Gezira', unit: 'Day', unitQty: '6.00', duration: '9.00', unitCostUsd: '50.00', nature: 'Individual consultants honoraria/fees', donorAccount: '71400', activityCode: 'GBVCAEPN9999' })
+    expect(l).toMatchObject({ ceilingUsd: '2700.00', fundCode: 'EUB98', state: 'Gezira', unit: 'Day', unitQty: '6.00', duration: '9.00', unitCostUsd: '50.00', nature: 'Individual consultants honoraria/fees', donorAccount: '71400', expenseAccountCode: '5201', activityCode: 'GBVCAEPN9999' })
     const att = await fm.get('/attachments?ownerType=project&ownerId=ice-1')
     expect(att.body).toHaveLength(1)
   })
