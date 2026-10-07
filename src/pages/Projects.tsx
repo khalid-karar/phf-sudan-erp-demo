@@ -2,7 +2,6 @@ import { ChevronDown, FileSpreadsheet, Lock, Plus, Shuffle, SlidersHorizontal } 
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ImportBudgetModal } from '../components/ImportBudgetModal'
-import { LIVE } from '../api/http'
 import { NewProjectModal } from '../components/NewProjectModal'
 import { ReallocationModal } from '../components/ReallocationModal'
 import { Button, PageHeader, Panel, StatusBadge, UsageBar, UsageLegend } from '../components/ui'
@@ -24,11 +23,9 @@ export function ProjectsList() {
         actions={
           can('projects', 'manage') && (
             <div className="flex gap-2">
-              {LIVE && (
-                <Button variant="quiet" onClick={() => setImporting(true)}>
-                  <FileSpreadsheet size={16} /> {ar ? 'استيراد من ملف المانح' : 'Import donor budget'}
-                </Button>
-              )}
+              <Button variant="quiet" onClick={() => setImporting(true)}>
+                <FileSpreadsheet size={16} /> {ar ? 'استيراد من ملف المانح' : 'Import donor budget'}
+              </Button>
               <Button onClick={() => setCreating(true)}>
                 <Plus size={16} /> {ar ? 'مشروع جديد' : 'New project'}
               </Button>

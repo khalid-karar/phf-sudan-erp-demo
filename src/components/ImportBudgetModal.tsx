@@ -1,7 +1,7 @@
 import { FileSpreadsheet, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, ApiError } from '../api/http'
+import { api, ApiError, LIVE } from '../api/http'
 import { errorText, refreshData } from '../api/live'
 import { useLang } from '../lib/i18n'
 import { useStore } from '../lib/store'
@@ -82,11 +82,16 @@ export function ImportBudgetModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title={ar ? 'استيراد ميزانية من ملف المانح' : 'Import a budget from the donor file'} wide>
       <div className="space-y-5">
+        {!LIVE && (
+          <div className="rounded-md border border-line bg-sand p-3 text-[13.5px]">
+            {ar ? 'هذه النسخة تجريبية داخل المتصفح. قراءة ملف المانح وإنشاء المشروع منه تعمل عند ربط النظام بالخادم (الوضع الحي).' : 'This is the in-browser demo. Reading the donor file and building the project from it works when the system is connected to the server (live mode).'}
+          </div>
+        )}
         <p className="text-[13.5px] text-muted">
           {ar ? 'ارفع ملف الميزانية (Excel) الذي أرسله المانح. يُنشأ المشروع ومحاوره (الأنشطة) وبنوده وسقوفها تلقائياً بدل الإدخال اليدوي، ويُحفظ الملف الأصلي مع المشروع.' : 'Upload the budget workbook (Excel) from the donor. The project, its activities and budget lines with their ceilings are created automatically instead of typing them, and the original file is kept with the project.'}
         </p>
         <input ref={input} type="file" accept=".xlsx" hidden onChange={(e) => pick(e.target.files?.[0] ?? null)} />
-        <button type="button" onClick={() => input.current?.click()} className="flex w-full items-center gap-3 rounded-lg border-2 border-dashed border-line p-4 text-start hover:border-nile-2">
+        <button type="button" disabled={!LIVE} onClick={() => input.current?.click()} className="flex w-full items-center gap-3 rounded-lg border-2 border-dashed border-line p-4 text-start hover:border-nile-2">
           {file ? <FileSpreadsheet className="text-leaf" /> : <Upload className="text-muted" />}
           <span className="text-[14.5px]">{file ? file.name : ar ? 'اختر ملف الميزانية (.xlsx)' : 'Choose the budget file (.xlsx)'}</span>
         </button>
