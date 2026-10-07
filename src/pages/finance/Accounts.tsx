@@ -250,8 +250,8 @@ function AddAccount({ open, onClose }: { open: boolean; onClose: () => void }) {
   const code = nextAccountCode(s.accounts, parent)
   const isCash = parent === '1101' || parent === '1102'
   const [currency, setCurrency] = useState<'SDG' | 'USD'>('SDG')
-  const save = () => {
-    s.addAccount({
+  const save = async () => {
+    const r = await s.addAccount({
       code,
       parent,
       name: { ar: nameAr || nameEn, en: nameEn || nameAr },
@@ -260,6 +260,7 @@ function AddAccount({ open, onClose }: { open: boolean; onClose: () => void }) {
       currency: isCash && postable ? currency : undefined,
       officeId: isCash && office ? office : undefined,
     })
+    if (r === false) return
     setNameAr('')
     setNameEn('')
     onClose()

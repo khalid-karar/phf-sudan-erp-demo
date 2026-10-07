@@ -5,6 +5,7 @@ import type { PayMethod, SpendRequest } from '../data/types'
 import { money, usd } from '../lib/format'
 import { useLang } from '../lib/i18n'
 import { useStore } from '../lib/store'
+import { LIVE } from '../api/http'
 import { Button, Modal } from './ui'
 
 export function PayModal({ req, open, onClose }: { req: SpendRequest; open: boolean; onClose: () => void }) {
@@ -12,8 +13,13 @@ export function PayModal({ req, open, onClose }: { req: SpendRequest; open: bool
   const ar = lang === 'ar'
   const s = useStore()
   const [method, setMethod] = useState<PayMethod>(req.activityCode ? 'advance' : 'bank')
-  const officeStaff = staff.filter((x) => x.officeId === req.officeId)
-  const [staffId, setStaffId] = useState(officeStaff[0]?.id ?? staff[0].id)
+  const roles = useStore((x) => x.roles)
+  // Live mode: the people who can hold an advance are the office's real users; the demo uses its sample staff.
+  const people = LIVE
+    ? s.users.filter((u) => u.active !== false).map((u) => ({ id: u.id, officeId: u.officeId, name: u.name, title: roles.find((r) => r.id === u.role)?.name ?? { ar: '', en: '' } }))
+    : staff
+  const officeStaff = people.filter((x) => x.officeId === req.officeId)
+  const [staffId, setStaffId] = useState(officeStaff[0]?.id ?? people[0]?.id ?? '')
 
   const methods: { k: PayMethod; icon: ReactNode; t: string; d: string }[] = [
     {
@@ -50,7 +56,7 @@ export function PayModal({ req, open, onClose }: { req: SpendRequest; open: bool
             <label className="block pt-2 text-[13.5px]">
               {ar ? 'الموظف المستلم للعهدة' : 'Staff member receiving the advance'}
               <select className="mt-1 h-10 w-full rounded-md border border-line bg-surface px-2" value={staffId} onChange={(e) => setStaffId(e.target.value)}>
-                {(officeStaff.length ? officeStaff : staff).map((x) => (
+                {(officeStaff.length ? officeStaff : people).map((x) => (
                   <option key={x.id} value={x.id}>
                     {x.name[lang]} — {x.title[lang]}
                   </option>
@@ -103,8 +109,8 @@ export function PayModal({ req, open, onClose }: { req: SpendRequest; open: bool
           {ar ? 'إلغاء' : 'Cancel'}
         </Button>
         <Button
-          onClick={() => {
-            s.issuePayment(req.id, method, staffId)
+          onClick={async () => {
+            if ((await s.issuePayment(req.id, method, staffId)) === false) return
             onClose()
           }}
         >

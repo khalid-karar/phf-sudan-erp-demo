@@ -268,8 +268,8 @@ function SettleModal({ advance: a, onClose }: { advance: Advance; onClose: () =>
         </Button>
         <Button
           disabled={!valid}
-          onClick={() => {
-            s.settleAdvance(a.id, items, act.report!.no)
+          onClick={async () => {
+            if ((await s.settleAdvance(a.id, items, act.report!.no)) === false) return
             onClose()
           }}
         >

@@ -1,9 +1,10 @@
 // The store's write actions in live mode: each one asks the server, and the screen then shows what the server holds.
-import type { FieldActivity, FieldReport, ApprovalRule, ControlMode, Office, OrgSettings, Reallocation, Role, SpendRequest, User } from '../data/types'
+import type { Account, PayMethod, SettlementItem, FieldActivity, FieldReport, ApprovalRule, ControlMode, Office, OrgSettings, Reallocation, Role, SpendRequest, User } from '../data/types'
 import { useStore } from '../lib/store'
 import { ApiError, api } from './http'
 import { act, errorText, refreshData } from './live'
 import { useSecret } from './secret'
+import { BANK_PTS, BANK_SDG, BANK_USD, cashAccount } from '../data/finance'
 
 const orgBody = (o: OrgSettings, deduct?: string) => ({
   nameAr: o.name.ar, nameEn: o.name.en, shortNameAr: o.shortName.ar, shortNameEn: o.shortName.en, hqNameAr: o.hqName.ar, hqNameEn: o.hqName.en,
@@ -196,6 +197,47 @@ export const liveActions = {
     return good === rows.length
   },
 }
+
+const closingPeriod = () => {
+  const d = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+const todayIso = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+Object.assign(liveActions, {
+  issuePayment: (requestId: string, method: PayMethod, staffId?: string) => {
+    const st = useStore.getState()
+    const req = st.requests.find((r) => r.id === requestId)
+    if (!req) return Promise.resolve(false)
+    const accountCode =
+      method === 'cash' || method === 'advance' ? cashAccount(req.officeId, st.accounts) : req.currency === 'USD' && method === 'bank' ? BANK_USD : req.officeId === 'pts' && method === 'bank' ? BANK_PTS : BANK_SDG
+    const holder = method === 'advance' ? st.users.find((u) => u.id === staffId) : undefined
+    return act(
+      () => api.post(`/finance/requests/${requestId}/pay`, { method, accountCode, ...(holder ? { holderUserId: holder.id, party: holder.name.en } : {}) }),
+      { ok: method === 'advance' ? { ar: 'صُرفت العهدة — تُسوّى بعد التقرير الفني', en: 'Advance issued — settle it after the field report' } : { ar: 'صدر سند الصرف وقُيّد في الدفتر', en: 'Payment voucher issued and posted' } },
+    )
+  },
+  recordReceipt: (d: { projectId?: string; amountUSD: number; account: string; revenueAccount: string; party: string; memo: string }) =>
+    act(() => api.post('/finance/receipts', { accountCode: d.account, revenueAccountCode: d.revenueAccount, amount: String(d.amountUSD), currency: 'USD', party: d.party, memo: d.memo, projectId: d.projectId ?? null }), { ok: { ar: 'سُجّل سند القبض', en: 'Receipt voucher recorded' } }),
+  settleAdvance: (id: string, items: SettlementItem[]) =>
+    act(() => api.post(`/finance/advances/${id}/settle`, { items: items.map((i) => ({ description: i.description, receiptNo: i.receiptNo || undefined, amount: String(i.amountUSD) })) }), { ok: { ar: 'تمت التسوية وترحيل القيد', en: 'Settled and posted' } }),
+  addAccount: (a: Account) =>
+    act(() => api.post('/finance/accounts', { code: a.code, parentCode: a.parent, nameAr: a.name.ar, nameEn: a.name.en, postable: a.postable, currency: a.currency ?? 'USD', officeId: a.officeId ?? null }), { ok: { ar: `أُضيف الحساب ${a.code}`, en: `Account ${a.code} added` } }),
+  setLineAccount: (lineId: string, code: string) => {
+    useStore.setState((s) => ({ lineMap: { ...s.lineMap, [lineId]: code } }))
+    return act(() => api.patch(`/projects/lines/${lineId}`, { expenseAccountCode: code }))
+  },
+  addRate: (rate: number) => act(() => api.post('/finance/rates', { date: todayIso(), rate: String(rate), source: 'Manual' }), { ok: { ar: 'سُجّل سعر الصرف', en: 'Exchange rate recorded' } }),
+  postRevaluation: () => act(() => api.post('/finance/revaluation', {}), { ok: { ar: 'رُحّل قيد فروق العملة', en: 'FX revaluation entry posted' } }),
+  setCashCounted: (officeId: string, v: boolean) => {
+    useStore.setState((s) => ({ closes: s.closes.map((c) => (c.officeId === officeId ? { ...c, cashCounted: v } : c)) }))
+    return act(() => api.put(`/finance/close/${closingPeriod()}/${officeId}/cash-counted`, { counted: v }))
+  },
+  closeMonth: (officeId: string) => act(() => api.post(`/finance/close/${closingPeriod()}/${officeId}`, {}), { ok: { ar: 'أُقفل الشهر للمكتب', en: 'Month closed for the office' } }),
+})
 
 let syncing = false
 

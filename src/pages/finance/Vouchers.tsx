@@ -202,8 +202,8 @@ function ReceiptModal({ open, onClose }: { open: boolean; onClose: () => void })
         </Button>
         <Button
           disabled={amount <= 0}
-          onClick={() => {
-            s.recordReceipt({ projectId: projectId || undefined, amountUSD: amount, account, revenueAccount: revenue, party, memo })
+          onClick={async () => {
+            if ((await s.recordReceipt({ projectId: projectId || undefined, amountUSD: amount, account, revenueAccount: revenue, party, memo })) === false) return
             onClose()
           }}
         >

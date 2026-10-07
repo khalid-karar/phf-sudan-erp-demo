@@ -184,15 +184,15 @@ interface State {
   closes: MonthClose[]
   fseq: { je: number; pv: number; rv: number; adv: number }
 
-  issuePayment: (requestId: string, method: PayMethod, staffId?: string) => void
-  recordReceipt: (d: { projectId?: string; amountUSD: number; account: string; revenueAccount: string; party: string; memo: string }) => void
-  settleAdvance: (id: string, items: SettlementItem[], reportNo: string) => void
-  addAccount: (a: Account) => void
-  setLineAccount: (lineId: string, code: string) => void
-  addRate: (rate: number) => void
-  postRevaluation: () => void
-  setCashCounted: (officeId: string, v: boolean) => void
-  closeMonth: (officeId: string) => void
+  issuePayment: (requestId: string, method: PayMethod, staffId?: string) => void | Promise<boolean>
+  recordReceipt: (d: { projectId?: string; amountUSD: number; account: string; revenueAccount: string; party: string; memo: string }) => void | Promise<boolean>
+  settleAdvance: (id: string, items: SettlementItem[], reportNo: string) => void | Promise<boolean>
+  addAccount: (a: Account) => void | Promise<boolean>
+  setLineAccount: (lineId: string, code: string) => void | Promise<boolean>
+  addRate: (rate: number) => void | Promise<boolean>
+  postRevaluation: () => void | Promise<boolean>
+  setCashCounted: (officeId: string, v: boolean) => void | Promise<boolean>
+  closeMonth: (officeId: string) => void | Promise<boolean>
 
   setLang: (l: Lang) => void
   setUser: (id: string) => void
@@ -1063,7 +1063,9 @@ export const useStore = create<State>()(
     set((s) => ({ accounts: [...s.accounts, a] }))
     get().toast({ ar: `أُضيف الحساب ${a.code}`, en: `Account ${a.code} added` })
   },
-  setLineAccount: (lineId, code) => set((s) => ({ lineMap: { ...s.lineMap, [lineId]: code } })),
+  setLineAccount: (lineId, code) => {
+    set((s) => ({ lineMap: { ...s.lineMap, [lineId]: code } }))
+  },
 
   addRate: (rate) => {
     const s = get()
@@ -1099,7 +1101,9 @@ export const useStore = create<State>()(
     get().toast({ ar: `رُحّل قيد فروق العملة ${je.no}`, en: `FX entry ${je.no} posted` }, net < 0 ? 'warn' : 'ok')
   },
 
-  setCashCounted: (officeId, v) => set((s) => ({ closes: s.closes.map((c) => (c.officeId === officeId ? { ...c, cashCounted: v } : c)) })),
+  setCashCounted: (officeId, v) => {
+    set((s) => ({ closes: s.closes.map((c) => (c.officeId === officeId ? { ...c, cashCounted: v } : c)) }))
+  },
   closeMonth: (officeId) => {
     set((s) => ({ closes: s.closes.map((c) => (c.officeId === officeId ? { ...c, closedAt: new Date().toISOString(), closedBy: s.userId } : c)) }))
     get().toast({ ar: 'أُقفل الشهر للمكتب — لا يمكن الترحيل بتاريخ سابق', en: 'Month closed for the office — no back-dated posting' })
