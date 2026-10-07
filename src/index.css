@@ -82,3 +82,13 @@ h3 {
 .pin-pulse {
   animation: pin-pulse 1.8s ease-out infinite;
 }
+
+/* Printing a form: only the .print-root sheet is shown, on A4. */
+.print-root { display: none; }
+@media print {
+  @page { size: A4; margin: 10mm; }
+  body > *:not(.print-root) { display: none !important; }
+  .print-root { display: block !important; background: #fff; color: #000; }
+  .print-root .form-sheet { break-after: page; }
+  .print-root .form-sheet:last-child { break-after: auto; }
+}
