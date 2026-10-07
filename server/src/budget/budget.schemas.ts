@@ -42,3 +42,5 @@ export const linePatch = z.object({
   nameEn: text.optional(),
   active: z.boolean().optional(),
 })
+
+export const linkBody = z.object({ activityId: z.string().min(1) })

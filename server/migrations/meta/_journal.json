@@ -64,6 +64,13 @@
       "when": 1791349142937,
       "tag": "0008_office_manager",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791349143937,
+      "tag": "0009_link_expense_activity",
+      "breakpoints": true
     }
   ]
 }

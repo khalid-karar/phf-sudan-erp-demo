@@ -77,3 +77,22 @@ describe('office manager', () => {
     expect((await admin.patch('/offices/ksl', { managerId: null })).body.managerId).toBeNull()
   })
 })
+
+describe('linking spending to an activity', () => {
+  it('fills the empty link once, and never lets the amount change', async () => {
+    const rows = (await admin.get('/projects/expenses')).body as { id: string; activityCode: string | null; officeId: string; amountUsd: string }[]
+    const loose = rows.find((r) => !r.activityCode)
+    if (!loose) return // the seed links every row
+    const acts = (await admin.get('/activities?limit=500')).body as { id: string; code: string; officeId: string }[]
+    const act = acts.find((a) => a.officeId === loose.officeId) ?? acts[0]
+    const ok = await admin.post(`/projects/expenses/${loose.id}/link`, { activityId: act.id })
+    expect(ok.status).toBe(201)
+    const after = (await admin.get('/projects/expenses')).body as typeof rows
+    const now = after.find((r) => r.id === loose.id)!
+    expect(now.activityCode).toBe(act.code)
+    expect(now.amountUsd).toBe(loose.amountUsd)
+    const again = await admin.post(`/projects/expenses/${loose.id}/link`, { activityId: act.id })
+    expect(again.status).toBe(409)
+    expect(again.body.code).toBe('ALREADY_LINKED')
+  })
+})

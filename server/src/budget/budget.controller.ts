@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common'
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post } from '@nestjs/common'
 import type { z } from 'zod'
 import type { AuthUser } from '../auth/auth-user'
 import { CurrentUser, Perm } from '../auth/decorators'
 import { Zod } from '../common/zod'
-import { checkBody, controlBody, linePatch, projectBody } from './budget.schemas'
+import { checkBody, controlBody, linkBody, linePatch, projectBody } from './budget.schemas'
 import { BudgetService } from './budget.service'
 
 @Controller('projects')
@@ -29,6 +29,13 @@ export class BudgetController {
   }
 
   @Perm('projects', 'view')
+  /** Declared before `:id` routes so "expenses" is not read as a project id. */
+  @Perm('activities', 'edit')
+  @Post('expenses/:lineId/link')
+  link(@CurrentUser() u: AuthUser, @Param('lineId', new ParseIntPipe()) lineId: number, @Body(new Zod(linkBody)) b: z.infer<typeof linkBody>) {
+    return this.budget.linkExpense(u, lineId, b.activityId)
+  }
+
   @Get(':id')
   tree(@Param('id') id: string) {
     return this.budget.tree(id)

@@ -3,10 +3,10 @@ import { asc, eq, sql } from 'drizzle-orm'
 import type { z } from 'zod'
 import { scopeOffice, type AuthUser } from '../auth/auth-user'
 import { audit } from '../common/audit'
-import { notFound, unprocessable } from '../common/errors'
+import { conflict, forbidden, notFound, unprocessable } from '../common/errors'
 import type { Db, DbOrTx } from '../db/client'
 import { DB } from '../db/db.module'
-import { accounts, budgetLines, pillars, projects } from '../db/schema'
+import { accounts, activities, budgetLines, pillars, projects } from '../db/schema'
 import { fromCents, sumCents, toCents } from '../lib/money'
 import type { controlBody, linePatch, projectBody } from './budget.schemas'
 import { checkCeiling, checkJson, projectUsage, usageJson } from './usage'
@@ -59,6 +59,27 @@ export class BudgetService {
       where je.source <> 'stock' ${office ? sql`and jl.office_id = ${office}` : sql``}
       order by je.date, jl.id`)
     return r.rows.map((x) => ({ id: x.id, date: x.date, lineId: x.line_id, projectId: x.project_id, officeId: x.office_id, amountUsd: x.amount_usd, activityCode: x.activity_code, requestId: x.request_id, hasTechReport: x.has_tech_report }))
+  }
+
+  /**
+   * Matches a posted spending line to the activity it paid for. The amount and accounts never change; only the empty
+   * activity link is filled in (the ledger guard allows exactly that), once.
+   */
+  async linkExpense(user: AuthUser, lineId: number, activityId: string) {
+    const office = scopeOffice(user)
+    return this.db.transaction(async (tx) => {
+      const r = await tx.execute<{ office_id: string; activity_id: string | null; type: string }>(sql`
+        select jl.office_id, jl.activity_id, ac.type from journal_lines jl join accounts ac on ac.code = jl.account_code where jl.id = ${lineId}::bigint for update of jl`)
+      const jl = r.rows[0]
+      if (!jl || jl.type !== 'expense') throw notFound({ ar: 'سطر المصروف', en: 'Spending line' })
+      const [a] = await tx.select({ id: activities.id, officeId: activities.officeId }).from(activities).where(eq(activities.id, activityId))
+      if (!a) throw notFound({ ar: 'النشاط', en: 'Activity' })
+      if (office && (jl.office_id !== office || a.officeId !== office)) throw forbidden({ ar: 'يمكنك ربط مصروفات مكتبك فقط', en: 'You can only link your own office’s spending' })
+      if (jl.activity_id) throw conflict('ALREADY_LINKED', { ar: 'هذا المصروف مرتبط بنشاط بالفعل', en: 'This spending is already linked to an activity' })
+      await tx.execute(sql`update journal_lines set activity_id = ${activityId} where id = ${lineId}::bigint`)
+      await audit(tx, user, 'expense.link', 'journal_line', String(lineId), { activityId })
+      return { ok: true }
+    })
   }
 
   /** Project → pillars → lines, each with its usage. */
