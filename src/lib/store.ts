@@ -1164,7 +1164,7 @@ export const useStore = create<State>()(
     set((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, controlMode: mode, tolerancePct } : p)) })),
   }),
   {
-    name: LIVE ? 'phf-erp-live-ui-v1' : 'phf-erp-demo-v10',
+    name: LIVE ? 'phf-erp-live-ui-v1' : 'phf-erp-demo-v11',
     storage: createJSONStorage(() => safeStorage),
     partialize: (s) => {
       const { toasts: _t, tourOpen: _o, ...rest } = s

@@ -168,7 +168,7 @@ export const roleNames = new Proxy({} as Record<string, { ar: string; en: string
 })
 
 export const orgDefaults: OrgSettings = {
-  name: { ar: 'صندوق إعانة المرضى — السودان', en: 'Patients Helping Fund — Sudan' },
+  name: { ar: 'منظمة صندوق إعانة المرضى — السودان', en: 'Patients Helping Fund Organization — Sudan' },
   shortName: { ar: 'نظام إدارة الموارد', en: 'Resource Management System' },
   logo: './phf-logo.png',
   hqName: { ar: 'المقر الرئيسي — دولة الكويت', en: 'Headquarters — State of Kuwait' },

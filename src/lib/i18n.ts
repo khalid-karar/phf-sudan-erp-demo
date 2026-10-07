@@ -2,7 +2,7 @@ import { useStore } from './store'
 
 const dict = {
   appName: { ar: 'نظام إدارة الموارد', en: 'Resource Management System' },
-  orgName: { ar: 'صندوق إعانة المرضى — السودان', en: 'Patients Helping Fund — Sudan' },
+  orgName: { ar: 'منظمة صندوق إعانة المرضى — السودان', en: 'Patients Helping Fund Organization — Sudan' },
   demo: { ar: 'نسخة عرض — بيانات تجريبية', en: 'Demo — sample data' },
   resetDemo: { ar: 'إعادة ضبط العرض', en: 'Reset demo' },
   actingAs: { ar: 'تعمل الآن بصفة', en: 'Acting as' },
