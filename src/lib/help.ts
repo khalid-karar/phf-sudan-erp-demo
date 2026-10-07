@@ -294,6 +294,15 @@ const rows: Row[] = [
     ['Pick the project, quarter and currency (SDG or USD).', 'Check the table, then “Download Excel” in the donor’s template format.', 'To get activity IDs and fund codes, create the project with “Import donor budget”.'],
   ],
   [
+    '/reports/statement',
+    'كشف حساب المشاريع',
+    'Projects statement',
+    'كل المشاريع بالميزانية والمستلم والمصروف والمتبقي بالدولار والجنيه، مع إجمالي كل مانح.',
+    'Every project with budget, received, spent and remaining in USD and SDG, with totals by donor.',
+    ['اختر التاريخ المطلوب الكشف حتى نهايته.', '«تنزيل Excel» لورقتين: المشاريع والمانحون.'],
+    ['Pick the as-of date.', '“Download Excel” gives two sheets: Projects and Donors.'],
+  ],
+  [
     '/reports/sent',
     'سجل الإرسال',
     'Sent reports',

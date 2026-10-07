@@ -106,6 +106,7 @@ export const modules: NavModule[] = [
       { to: '/reports/hq', label: { ar: 'التقرير الشهري للمقر', en: 'Monthly HQ report' }, hint: { ar: 'إلى المقر الرئيسي في الكويت', en: 'To headquarters in Kuwait' } },
       { to: '/reports/donor', label: { ar: 'تقرير المانح', en: 'Donor report' } },
       { to: '/reports/expenditure', label: { ar: 'تقرير المصروفات الربع سنوي', en: 'Quarterly expenditure report' }, hint: { ar: 'بنموذج المانح (Excel)', en: 'Donor template (Excel)' } },
+      { to: '/reports/statement', label: { ar: 'كشف حساب المشاريع', en: 'Projects statement' }, hint: { ar: 'بالدولار والجنيه', en: 'USD and SDG' } },
       { to: '/reports/sent', label: { ar: 'سجل الإرسال', en: 'Sent reports' } },
     ],
   },

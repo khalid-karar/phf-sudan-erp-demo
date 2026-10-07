@@ -35,6 +35,7 @@ import { Fleet, Shipments } from './pages/supply/Logistics'
 import { DonorReport } from './pages/reports/DonorReport'
 import { ExpenditureReport } from './pages/reports/ExpenditureReport'
 import { HqReport } from './pages/reports/HqReport'
+import { ProjectsStatement } from './pages/reports/ProjectsStatement'
 import { SentReports } from './pages/reports/SentReports'
 import { ReportSettings } from './pages/settings/ReportSettings'
 import { Calendar } from './pages/alerts/Calendar'
@@ -74,6 +75,7 @@ const routes: [string, React.ReactNode][] = [
   ['/reports/hq', <HqReport />],
   ['/reports/donor', <DonorReport />],
   ['/reports/expenditure', <ExpenditureReport />],
+  ['/reports/statement', <ProjectsStatement />],
   ['/reports/sent', <SentReports />],
   ['/supply', <Stock />],
   ['/supply/receipts', <Receipts />],

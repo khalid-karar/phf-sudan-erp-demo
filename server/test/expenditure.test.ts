@@ -75,3 +75,30 @@ describe('quarterly detailed expenditure report', () => {
     expect((await request(app.getHttpServer()).get('/api/v1' + Q())).status).toBe(401)
   })
 })
+
+describe('projects statement', () => {
+  it('shows every project in USD and SDG with donor totals, as JSON and Excel', async () => {
+    const r = await fm.get('/reports/projects-statement')
+    expect(r.status).toBe(200)
+    expect(r.body.rows.length).toBeGreaterThanOrEqual(2)
+    const pa = r.body.rows.find((x: { id: string }) => x.id === 'pa')
+    expect(Number(pa.budgetUsd)).toBeGreaterThan(0)
+    expect(Number(pa.budgetSdg)).toBeGreaterThan(Number(pa.budgetUsd))
+    const sum = r.body.rows.reduce((t: number, x: { budgetUsd: string }) => t + Number(x.budgetUsd), 0)
+    expect(Number(r.body.total.budgetUsd)).toBeCloseTo(sum, 2)
+    expect(r.body.donors.length).toBeGreaterThan(0)
+    const x = await request(app.getHttpServer()).get('/api/v1/reports/projects-statement.xlsx').set('authorization', `Bearer ${fm.token}`).buffer(true).parse((res, cb) => {
+      const c: Buffer[] = []
+      res.on('data', (d: Buffer) => c.push(d))
+      res.on('end', () => cb(null, Buffer.concat(c)))
+    })
+    expect(x.status).toBe(200)
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(x.body as never)
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Projects', 'Donors'])
+  })
+
+  it('is closed to office-limited staff', async () => {
+    expect([401, 403]).toContain((await fo.get('/reports/projects-statement')).status)
+  })
+})

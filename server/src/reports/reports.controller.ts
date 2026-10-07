@@ -7,6 +7,7 @@ import { period as periodSchema } from '../common/zod'
 import { Zod } from '../common/zod'
 import * as s from './reports.schemas'
 import { ExpenditureService, expenditureQuery } from './expenditure.service'
+import { StatementService, statementQuery } from './statement.service'
 import { ReportsService } from './reports.service'
 
 const P = new Zod(periodSchema)
@@ -16,7 +17,19 @@ export class ReportsController {
   constructor(
     private readonly svc: ReportsService,
     private readonly exp: ExpenditureService,
+    private readonly stmt: StatementService,
   ) {}
+
+  @Perm('reports', 'view') @Get('reports/projects-statement')
+  statement(@CurrentUser() u: AuthUser, @Query(new Zod(statementQuery)) q: z.infer<typeof statementQuery>) { return this.stmt.build(u, q.asOf) }
+  @Perm('reports', 'view') @Get('reports/projects-statement.xlsx')
+  async statementXlsx(@CurrentUser() u: AuthUser, @Query(new Zod(statementQuery)) q: z.infer<typeof statementQuery>, @Res() res: Response) {
+    const x = await this.stmt.xlsx(u, q.asOf)
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader('Content-Disposition', `attachment; filename="${x.fileName}"`)
+    res.setHeader('Cache-Control', 'no-store')
+    res.end(x.buf)
+  }
 
   @Perm('reports', 'view') @Get('reports/expenditure')
   expenditure(@CurrentUser() u: AuthUser, @Query(new Zod(expenditureQuery)) q: z.infer<typeof expenditureQuery>) { return this.exp.build(u, q) }
