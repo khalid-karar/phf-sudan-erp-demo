@@ -60,3 +60,22 @@ export async function signOut() {
   window.location.hash = '#/'
   window.location.reload()
 }
+
+// Actions that stay on the screen only (or just read) and so need no server.
+const LOCAL = new Set(['startTour', 'endTour', 'markVisited', 'hideChecklist', 'setLang', 'setSidebarCollapsed', 'toast', 'dismissToast', 'lowStockCount', 'qtyOf', 'unreadCount', 'gapCount'])
+// Actions already connected to the server — add a name here as each one is wired.
+export const WIRED = new Set<string>([])
+
+/** Until a screen's action is connected, it says so instead of changing only the local copy that the next refresh would erase. */
+export function guardUnwired() {
+  const st = useStore.getState() as unknown as Record<string, unknown>
+  const stubs: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(st)) {
+    if (typeof v !== 'function' || LOCAL.has(k) || WIRED.has(k)) continue
+    stubs[k] = () => {
+      useStore.getState().toast({ ar: 'هذه العملية غير موصولة بالخادم بعد.', en: 'This action is not connected to the server yet.' }, 'warn')
+      return false
+    }
+  }
+  useStore.setState(stubs as never)
+}

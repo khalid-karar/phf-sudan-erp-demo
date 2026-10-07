@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Field, inputCls } from '../components/ui'
 import { useStore } from '../lib/store'
 import { ApiError, changePassword, hasRefreshToken, login, resume, whenSignedOut } from './http'
-import { bootstrapLive } from './live'
+import { guardUnwired, bootstrapLive } from './live'
 
 type Phase = 'checking' | 'signedOut' | 'mustChange' | 'loading' | 'ready' | 'error'
 
@@ -153,6 +153,7 @@ export function LiveGate({ children }: { children: ReactNode }) {
     setPhase('loading')
     try {
       await bootstrapLive()
+      guardUnwired()
       setPhase('ready')
     } catch (e) {
       setFailure(e instanceof ApiError ? e.msg[lang] : ar ? 'تعذّر تحميل البيانات.' : 'Could not load the data.')

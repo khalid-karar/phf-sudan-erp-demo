@@ -1,4 +1,6 @@
-import { HashRouter, Route, Routes } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { LIVE } from './api/http'
+import { LiveGate } from './api/LiveGate'
 import { Guard } from './components/Guard'
 import { Layout } from './components/Layout'
 import { Activities, ActivityDetail } from './pages/activities/Activities'
@@ -88,10 +90,10 @@ const routes: [string, React.ReactNode][] = [
 ]
 
 export default function App() {
-  return (
+  const app = (
     <HashRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={LIVE ? <Navigate to="/" replace /> : <Login />} />
         <Route
           path="*"
           element={
@@ -108,4 +110,5 @@ export default function App() {
       </Routes>
     </HashRouter>
   )
+  return LIVE ? <LiveGate>{app}</LiveGate> : app
 }

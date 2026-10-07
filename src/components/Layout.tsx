@@ -1,3 +1,5 @@
+import { LIVE } from '../api/http'
+import { signOut } from '../api/live'
 import {
   Bell,
   Boxes,
@@ -306,7 +308,7 @@ function UserMenu() {
               {user.email}
             </div>
           </div>
-          <div className="p-1.5">
+          {!LIVE && <div className="p-1.5">
             <div className="px-2.5 pt-1.5 pb-1 text-[12.5px] text-muted">{lang === 'ar' ? 'الدخول بمستخدم آخر (للعرض)' : 'Sign in as another user (demo)'}</div>
             <input
               className="mx-1 mb-1 h-8 w-[calc(100%-8px)] rounded-md border border-line px-2.5 text-[13px]"
@@ -338,7 +340,7 @@ function UserMenu() {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
           <div className="border-t border-line p-1.5">
             <button
               onClick={() => {
@@ -349,7 +351,7 @@ function UserMenu() {
             >
               <HelpCircle size={16} className="text-muted" /> {lang === 'ar' ? 'مركز المساعدة' : 'Help centre'}
             </button>
-            <button
+            {!LIVE && <button
               onClick={() => {
                 setOpen(false)
                 reset()
@@ -358,10 +360,11 @@ function UserMenu() {
               className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] hover:bg-paper"
             >
               <RotateCcw size={16} className="text-muted" /> {t('resetDemo')}
-            </button>
+            </button>}
             <button
               onClick={() => {
                 setOpen(false)
+                if (LIVE) return void signOut()
                 go('/login')
               }}
               className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] hover:bg-paper"

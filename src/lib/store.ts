@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { LIVE } from '../api/http'
 import { buildSeed, daysFromNow, offices as seedOffices, orgDefaults, projects as seedProjects, roles as seedRoles, users as seedUsers } from '../data/seed'
 import {
   accounts as seedAccounts,
@@ -82,6 +83,7 @@ export interface Toast {
 interface State {
   lang: Lang
   userId: string
+  serverUsage?: Record<string, import('./budget').Usage> | null
   org: OrgSettings
   offices: Office[]
   users: User[]
@@ -387,7 +389,8 @@ export const useStore = create<State>()(
   persist(
   (set, get) => ({
   lang: initialLang(),
-  userId: 'u-fo',
+  userId: LIVE ? '' : 'u-fo',
+  serverUsage: null,
   toasts: [],
   sidebarCollapsed: false,
   tourOpen: false,
@@ -1124,12 +1127,14 @@ export const useStore = create<State>()(
     set((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, controlMode: mode, tolerancePct } : p)) })),
   }),
   {
-    name: 'phf-erp-demo-v9',
+    name: LIVE ? 'phf-erp-live-ui-v1' : 'phf-erp-demo-v9',
     storage: createJSONStorage(() => safeStorage),
     partialize: (s) => {
       const { toasts: _t, tourOpen: _o, ...rest } = s
       void _t
       void _o
+      // Live mode keeps only screen preferences here; the data always comes from the server.
+      if (LIVE) return { lang: s.lang, sidebarCollapsed: s.sidebarCollapsed, tourSeen: s.tourSeen, visited: s.visited, checklistHidden: s.checklistHidden } as typeof rest
       return rest
     },
   },
@@ -1139,7 +1144,7 @@ export const useStore = create<State>()(
 // Re-evaluate notification rules shortly after data changes (debounced).
 let notifTimer: ReturnType<typeof setTimeout> | undefined
 let lastSig = ''
-useStore.subscribe((st) => {
+if (!LIVE) useStore.subscribe((st) => {
   const sig = [st.requests, st.reallocations, st.deadlines, st.advances, st.activities, st.expenses, st.closes, st.notifRules, st.projects, (st as unknown as { stock?: unknown }).stock]
     .map((x) => (Array.isArray(x) ? x.length + ':' + JSON.stringify(x).length : String(x && JSON.stringify(x).length)))
     .join('|')
@@ -1148,7 +1153,7 @@ useStore.subscribe((st) => {
   clearTimeout(notifTimer)
   notifTimer = setTimeout(() => useStore.getState().runNotifications(), 250)
 })
-setTimeout(() => useStore.getState().runNotifications(), 50)
+if (!LIVE) setTimeout(() => useStore.getState().runNotifications(), 50)
 
 // Role names are read outside React in a few places; keep a live copy.
 const syncRoles = () => ((globalThis as { __phfRoles?: Role[] }).__phfRoles = useStore.getState().roles)
