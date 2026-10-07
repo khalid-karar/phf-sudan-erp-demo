@@ -159,11 +159,11 @@ interface State {
   importReports: (rows: { activityId: string; report: FieldReport }[]) => void
   gapCount: () => number
 
-  setOrg: (patch: Partial<OrgSettings>) => void
-  saveOffice: (o: Office) => void
-  saveUser: (u: User) => void
-  saveRole: (r: Role) => void
-  deleteRole: (id: string) => void
+  setOrg: (patch: Partial<OrgSettings>) => void | Promise<boolean>
+  saveOffice: (o: Office) => void | Promise<boolean>
+  saveUser: (u: User) => void | Promise<boolean>
+  saveRole: (r: Role) => void | Promise<boolean>
+  deleteRole: (id: string) => void | Promise<boolean>
   setSidebarCollapsed: (v: boolean) => void
   projects: Project[]
   expenses: Expense[]

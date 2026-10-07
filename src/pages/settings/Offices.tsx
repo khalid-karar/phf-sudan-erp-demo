@@ -94,9 +94,9 @@ function OfficeModal({ office, onClose }: { office: Office; onClose: () => void 
   const [d, setD] = useState<Office>(office)
   const [picked, setPicked] = useState(!isNew)
   const valid = (d.name.ar || d.name.en).trim().length > 1 && picked
-  const save = () => {
+  const save = async () => {
     const id = d.id || `of-${Date.now().toString(36)}`
-    s.saveOffice({ ...d, id, name: { ar: d.name.ar || d.name.en, en: d.name.en || d.name.ar }, state: { ar: d.state.ar || d.state.en, en: d.state.en || d.state.ar } })
+    if ((await s.saveOffice({ ...d, id, name: { ar: d.name.ar || d.name.en, en: d.name.en || d.name.ar }, state: { ar: d.state.ar || d.state.en, en: d.state.en || d.state.ar } })) === false) return
     onClose()
   }
   return (

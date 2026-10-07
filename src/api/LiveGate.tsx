@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Field, inputCls } from '../components/ui'
 import { useStore } from '../lib/store'
 import { ApiError, changePassword, hasRefreshToken, login, resume, whenSignedOut } from './http'
+import { SecretDialog } from './secret'
 import { guardUnwired, bootstrapLive } from './live'
 
 type Phase = 'checking' | 'signedOut' | 'mustChange' | 'loading' | 'ready' | 'error'
@@ -170,7 +171,13 @@ export function LiveGate({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (phase === 'ready') return <>{children}</>
+  if (phase === 'ready')
+    return (
+      <>
+        {children}
+        <SecretDialog />
+      </>
+    )
   if (phase === 'signedOut')
     return (
       <Shell>

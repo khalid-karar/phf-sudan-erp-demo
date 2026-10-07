@@ -46,10 +46,10 @@ export function Roles() {
   const dirty = !saved || JSON.stringify(saved) !== JSON.stringify(d)
   const usersWith = (id: string) => s.users.filter((u) => u.role === id).length
   const setLevel = (m: ModuleKey, l: Access) => setD({ ...d, permissions: { ...d.permissions, [m]: l } })
-  const save = () => {
-    const id = d.id || `role-${Date.now().toString(36)}`
+  const save = async () => {
+    const id = d.id || `role_${Date.now().toString(36)}`
     const r = { ...d, id }
-    s.saveRole(r)
+    if ((await s.saveRole(r)) === false) return
     setSelId(id)
     setD(r)
     s.toast({ ar: `حُفظ الدور «${r.name.ar}» — يسري فوراً على ${usersWith(id)} مستخدم`, en: `Role “${r.name.en}” saved — applies now to ${usersWith(id)} users` })
@@ -219,9 +219,9 @@ export function Roles() {
                   variant="danger"
                   disabled={usersWith(saved.id) > 0}
                   title={usersWith(saved.id) > 0 ? (ar ? 'انقل المستخدمين إلى دور آخر أولاً' : 'Move its users to another role first') : undefined}
-                  onClick={() => {
-                    s.deleteRole(saved.id)
-                    pick(s.roles[0])
+                  onClick={async () => {
+                    if ((await s.deleteRole(saved.id)) === false) return
+                    pick(useStore.getState().roles[0])
                   }}
                 >
                   <Trash2 size={15} /> {ar ? 'حذف الدور' : 'Delete role'}

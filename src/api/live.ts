@@ -1,6 +1,7 @@
 // Live mode runtime: loads data into the store, refreshes it after a change, and turns failures into messages.
 import { useStore } from '../lib/store'
 import { ApiError, logout as apiLogout } from './http'
+import { liveActions } from './actions'
 import { loadCore, loadData } from './load'
 
 type Patch = Record<string, unknown>
@@ -64,7 +65,7 @@ export async function signOut() {
 // Actions that stay on the screen only (or just read) and so need no server.
 const LOCAL = new Set(['startTour', 'endTour', 'markVisited', 'hideChecklist', 'setLang', 'setSidebarCollapsed', 'toast', 'dismissToast', 'lowStockCount', 'qtyOf', 'unreadCount', 'gapCount'])
 // Actions already connected to the server — add a name here as each one is wired.
-export const WIRED = new Set<string>([])
+export const WIRED = new Set<string>(Object.keys(liveActions))
 
 /** Until a screen's action is connected, it says so instead of changing only the local copy that the next refresh would erase. */
 export function guardUnwired() {
@@ -77,5 +78,5 @@ export function guardUnwired() {
       return false
     }
   }
-  useStore.setState(stubs as never)
+  useStore.setState({ ...stubs, ...liveActions } as never)
 }

@@ -122,8 +122,8 @@ function UserModal({ user, onClose }: { user: User; onClose: () => void }) {
   const role = s.roles.find((r) => r.id === d.role)
   const emailOk = !d.email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)
   const valid = (d.name.ar || d.name.en).trim().length > 1 && emailOk && !!d.email
-  const save = () => {
-    s.saveUser({ ...d, id: d.id || `u-${Date.now().toString(36)}`, name: { ar: d.name.ar || d.name.en, en: d.name.en || d.name.ar } })
+  const save = async () => {
+    if ((await s.saveUser({ ...d, id: d.id || `u-${Date.now().toString(36)}`, name: { ar: d.name.ar || d.name.en, en: d.name.en || d.name.ar } })) === false) return
     onClose()
   }
   const isSelf = d.id === s.userId
