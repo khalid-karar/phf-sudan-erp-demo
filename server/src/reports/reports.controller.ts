@@ -1,17 +1,33 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Put, Query, Res } from '@nestjs/common'
+import type { Response } from 'express'
 import type { z } from 'zod'
 import type { AuthUser } from '../auth/auth-user'
 import { CurrentUser, Perm } from '../auth/decorators'
 import { period as periodSchema } from '../common/zod'
 import { Zod } from '../common/zod'
 import * as s from './reports.schemas'
+import { ExpenditureService, expenditureQuery } from './expenditure.service'
 import { ReportsService } from './reports.service'
 
 const P = new Zod(periodSchema)
 
 @Controller()
 export class ReportsController {
-  constructor(private readonly svc: ReportsService) {}
+  constructor(
+    private readonly svc: ReportsService,
+    private readonly exp: ExpenditureService,
+  ) {}
+
+  @Perm('reports', 'view') @Get('reports/expenditure')
+  expenditure(@CurrentUser() u: AuthUser, @Query(new Zod(expenditureQuery)) q: z.infer<typeof expenditureQuery>) { return this.exp.build(u, q) }
+  @Perm('reports', 'view') @Get('reports/expenditure.xlsx')
+  async expenditureXlsx(@CurrentUser() u: AuthUser, @Query(new Zod(expenditureQuery)) q: z.infer<typeof expenditureQuery>, @Res() res: Response) {
+    const x = await this.exp.xlsx(u, q)
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader('Content-Disposition', `attachment; filename="${x.fileName}"`)
+    res.setHeader('Cache-Control', 'no-store')
+    res.end(x.buf)
+  }
 
   @Perm('reports', 'view') @Get('reports/monthly')
   monthly(@CurrentUser() u: AuthUser, @Query(new Zod(s.periodQuery)) q: z.infer<typeof s.periodQuery>) { return this.svc.monthly(u, q.period) }
