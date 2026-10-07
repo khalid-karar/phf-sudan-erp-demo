@@ -257,7 +257,7 @@ export function Fleet() {
   const { can, scopeOffice } = usePerm()
   const [fuel, setFuel] = useState<Vehicle | null>(null)
   const list = s.vehicles.filter((v) => !scopeOffice || v.officeId === scopeOffice)
-  const rate = s.rates.at(-1)!.rate
+  const rate = (s.rates.at(-1)?.rate ?? 1)
   return (
     <div>
       <PageHeader title={ar ? 'المركبات والوقود' : 'Vehicles & fuel'} sub={ar ? 'حالة كل مركبة، واستهلاك الوقود، وموعد الصيانة القادم.' : 'Each vehicle’s status, fuel use and next service.'} />

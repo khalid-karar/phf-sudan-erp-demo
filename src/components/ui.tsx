@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { useEffect, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import type { RequestStatus, StepStatus } from '../data/types'
 import type { Usage } from '../lib/budget'
 import { useT } from '../lib/i18n'
@@ -138,7 +138,7 @@ export function Toasts() {
           }`}
         >
           {t.text[lang]}
-          <button onClick={() => dismiss(t.id)} aria-label="dismiss" className="opacity-70 hover:opacity-100">
+          <button onClick={() => dismiss(t.id)} aria-label={lang === 'ar' ? 'إغلاق' : 'Dismiss'} className="opacity-70 hover:opacity-100">
             <X size={15} />
           </button>
         </div>
@@ -148,24 +148,51 @@ export function Toasts() {
 }
 
 export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; wide?: boolean }) {
+  const lang = useStore((s) => s.lang)
+  const box = useRef<HTMLDivElement>(null)
+  const pressedOutside = useRef(false)
   useEffect(() => {
     if (!open) return
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const before = document.activeElement as HTMLElement | null
+    const first = box.current?.querySelector<HTMLElement>('input, select, textarea, button:not([aria-label])')
+    ;(first ?? box.current)?.focus()
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return onClose()
+      if (e.key !== 'Tab' || !box.current) return
+      // Keep Tab inside the dialog.
+      const f = [...box.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+      if (!f.length) return
+      const a = f[0]
+      const z = f[f.length - 1]
+      if (e.shiftKey && document.activeElement === a) (e.preventDefault(), z.focus())
+      else if (!e.shiftKey && document.activeElement === z) (e.preventDefault(), a.focus())
+    }
     window.addEventListener('keydown', k)
-    return () => window.removeEventListener('keydown', k)
+    return () => {
+      window.removeEventListener('keydown', k)
+      before?.focus?.()
+    }
   }, [open, onClose])
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 pt-[8vh]" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 pt-[8vh]"
+      onMouseDown={(e) => (pressedOutside.current = e.target === e.currentTarget)}
+      onMouseUp={(e) => {
+        // Closes only on a full click on the backdrop, so selecting text and letting go outside never throws away what was typed.
+        if (pressedOutside.current && e.target === e.currentTarget) onClose()
+        pressedOutside.current = false
+      }}
+    >
       <div
+        ref={box}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         className={`w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-lg bg-surface shadow-2xl`}
-        onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h2 className="text-[17px] font-semibold">{title}</h2>
-          <button onClick={onClose} className="text-muted hover:text-ink" aria-label="close">
+          <button onClick={onClose} className="text-muted hover:text-ink" aria-label={lang === 'ar' ? 'إغلاق' : 'Close'}>
             <X size={18} />
           </button>
         </div>

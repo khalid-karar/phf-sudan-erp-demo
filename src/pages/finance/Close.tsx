@@ -11,7 +11,7 @@ export function useCloseChecks() {
   const s = useStore()
   const { start, end } = closingPeriod()
   return getOffices().map((o) => {
-    const c = s.closes.find((x) => x.officeId === o.id)!
+    const c = s.closes.find((x) => x.officeId === o.id) ?? { officeId: o.id, cashCounted: false, closedAt: undefined }
     const lateAdv = s.advances.filter((a) => a.officeId === o.id && a.status === 'open' && +new Date(a.dueAt) <= +new Date(end))
     const unmatched = s.expenses.filter((e) => e.officeId === o.id && !e.hasTechReport && +new Date(e.date) >= +new Date(start) && +new Date(e.date) <= +new Date(end))
     const pendingSettle = s.advances.filter((a) => a.officeId === o.id && a.status === 'open' && activityFor(a.activityCode)?.report)

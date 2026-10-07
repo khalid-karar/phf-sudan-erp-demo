@@ -5,6 +5,7 @@ import { GetStarted } from '../components/GetStarted'
 import { PageHelpButton } from '../components/Help'
 import { SudanMap, type SiteStatus } from '../components/SudanMap'
 import { Panel, UsageBar, UsageLegend } from '../components/ui'
+import { LIVE } from '../api/http'
 import { funds } from '../data/seed'
 import { lineUsage, pct, projectUsage } from '../lib/budget'
 import { date, daysUntil, relDays, usd } from '../lib/format'
@@ -152,7 +153,7 @@ export function Dashboard() {
         <FundBlock
           title={cash.name[lang]}
           route={cash.donor[lang]}
-          received={cash.receivedUSD}
+          received={LIVE ? s.vouchers.filter((v) => v.kind === 'receipt').reduce((t, v) => t + v.amountUSD, 0) : cash.receivedUSD}
           parts={[
             { v: cashSpent, label: ar ? 'مصروف' : 'Spent', cls: 'bg-nile' },
             { v: cashCommitted, label: ar ? 'محجوز' : 'Committed', cls: 'bg-amber' },

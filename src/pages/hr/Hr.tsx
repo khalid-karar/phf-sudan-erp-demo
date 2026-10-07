@@ -280,7 +280,7 @@ function EmployeeModal({ emp, onClose }: { emp: Employee; onClose: () => void })
                       <div className="mt-2">
                         <UsageBar u={lu} height={6} />
                         <div className="num mt-0.5 text-[11.5px] text-muted">
-                          {ar ? 'المتاح على البند' : 'Available on line'} {usd(lu.available)} — {ar ? 'الحصة الشهرية' : 'monthly share'} {usd((d.salarySDG / s.rates.at(-1)!.rate) * (a.pct / 100))}
+                          {ar ? 'المتاح على البند' : 'Available on line'} {usd(lu.available)} — {ar ? 'الحصة الشهرية' : 'monthly share'} {usd((d.salarySDG / (s.rates.at(-1)?.rate ?? 1)) * (a.pct / 100))}
                         </div>
                       </div>
                     )}
@@ -368,7 +368,8 @@ export function Leave() {
           <div className="mb-2 text-[13.5px] font-medium">{ar ? 'غائبون هذا الأسبوع' : 'Away this week'}</div>
           <div className="flex flex-wrap gap-2">
             {away.map((l) => {
-              const e = s.employees.find((x) => x.id === l.employeeId)!
+              const e = s.employees.find((x) => x.id === l.employeeId)
+              if (!e) return null
               return (
                 <span key={l.id} className="rounded-md bg-amber-soft px-3 py-1.5 text-[13px] text-amber">
                   {e.name[lang]} — <span className="num">{date(l.from, lang)} – {date(l.to, lang)}</span>
@@ -392,7 +393,8 @@ export function Leave() {
           </thead>
           <tbody className="divide-y divide-line">
             {list.map((l) => {
-              const e = s.employees.find((x) => x.id === l.employeeId)!
+              const e = s.employees.find((x) => x.id === l.employeeId)
+              if (!e) return null
               const short = l.type === 'annual' && l.status === 'pending' && l.days > e.leaveBalance
               return (
                 <tr key={l.id}>
@@ -526,7 +528,7 @@ export function Payroll() {
   const s = useStore()
   const { can } = usePerm()
   const [period, setPeriod] = useState(lastMonth())
-  const rate = s.rates.at(-1)!.rate
+  const rate = (s.rates.at(-1)?.rate ?? 1)
   const run = s.payrolls.find((p) => p.period === period)
   // Live: the server works the month out (pay days, unpaid leave, the insurance percentage set in settings) and checks each line's ceiling.
   const [sv, setSv] = useState<PayrollPreview | null>(null)

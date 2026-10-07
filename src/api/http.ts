@@ -71,20 +71,22 @@ async function fail(res: Response): Promise<never> {
 }
 
 // Only one refresh at a time: several requests failing together share it.
-let refreshing: Promise<boolean> | null = null
-async function refresh(): Promise<boolean> {
+// "denied" means the server said the session is over; "unreachable" means we could not ask (weak connection), so the session is kept.
+type Refreshed = 'ok' | 'denied' | 'unreachable'
+let refreshing: Promise<Refreshed> | null = null
+async function refresh(): Promise<Refreshed> {
   const rt = store.get()
-  if (!rt) return false
-  refreshing ??= (async () => {
+  if (!rt) return 'denied'
+  refreshing ??= (async (): Promise<Refreshed> => {
     try {
       const res = await raw('POST', '/auth/refresh', { refreshToken: rt }, null)
-      if (!res.ok) return false
+      if (!res.ok) return res.status === 401 || res.status === 403 || res.status === 400 ? 'denied' : 'unreachable'
       const j = (await res.json()) as { accessToken: string; refreshToken: string }
       access = j.accessToken
       store.set(j.refreshToken)
-      return true
+      return 'ok'
     } catch {
-      return false
+      return 'unreachable'
     } finally {
       setTimeout(() => (refreshing = null), 0)
     }
@@ -94,7 +96,11 @@ async function refresh(): Promise<boolean> {
 
 async function send<T>(method: string, path: string, body?: unknown, form?: FormData, asBlob = false): Promise<T> {
   let res = await raw(method, path, body, access, form)
-  if (res.status === 401 && (await refresh())) res = await raw(method, path, body, access, form)
+  if (res.status === 401) {
+    const r = await refresh()
+    if (r === 'ok') res = await raw(method, path, body, access, form)
+    else if (r === 'unreachable') throw offline() // keep the session; the request can be retried when the connection is back
+  }
   if (res.status === 401) {
     access = null
     store.set(null)
@@ -133,7 +139,7 @@ export async function login(email: string, password: string): Promise<LoginResul
 /** Picks up a saved session (after a page reload). True when there is one that still works. */
 export async function resume(): Promise<boolean> {
   if (access) return true
-  return refresh()
+  return (await refresh()) === 'ok'
 }
 
 export async function logout() {

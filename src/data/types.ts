@@ -287,6 +287,8 @@ export interface OutboxItem {
   activityId: string
   report: FieldReport
   savedAt: string
+  userId?: string // live mode: whose report it is, so another person signing in on the same device never sends it
+  error?: string // live mode: the server refused it; it stays here for the person to see and is not retried automatically
 }
 
 export interface SettlementItem {

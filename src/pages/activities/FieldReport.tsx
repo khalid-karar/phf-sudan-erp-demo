@@ -180,7 +180,15 @@ export function FieldReport() {
           <CloudOff size={17} className="text-amber" />
           {ar ? `${s.outbox.length} تقرير محفوظ على الجهاز بانتظار الإرسال` : `${s.outbox.length} report(s) saved on this device, waiting to send`}
         </div>
-        <Button variant="quiet" className="h-9" disabled={!online} onClick={s.syncOutbox}>
+        <Button
+          variant="quiet"
+          className="h-9"
+          disabled={!online}
+          onClick={() => {
+            useStore.setState((st) => ({ outbox: st.outbox.map(({ error: _e, ...o }) => o) })) // try the refused ones again too
+            s.syncOutbox()
+          }}
+        >
           <CloudUpload size={16} /> {ar ? 'إرسال الآن' : 'Send now'}
         </Button>
       </div>
@@ -190,6 +198,7 @@ export function FieldReport() {
           return (
             <li key={o.id} className="num">
               {a?.code} — {a?.title[lang]} ({date(o.savedAt, lang)})
+              {o.error && <span className="ms-2 text-crescent">{o.error}</span>}
             </li>
           )
         })}

@@ -48,9 +48,10 @@ export function Approvals() {
         <Panel className="mb-6" title={ar ? 'طلبات المناقلة' : 'Reallocation requests'}>
           <ul className="divide-y divide-line">
             {ras.map((r) => {
-              const p = s.projects.find((x) => x.id === r.projectId)!
-              const from = findLine([p], r.fromLineId)!
-              const to = findLine([p], r.toLineId)!
+              const p = s.projects.find((x) => x.id === r.projectId)
+              const from = p && findLine([p], r.fromLineId)
+              const to = p && findLine([p], r.toLineId)
+              if (!p || !from || !to) return null // a role without project access may not have these loaded
               return (
                 <li key={r.id} className="grid gap-4 px-5 py-4 md:grid-cols-[1fr_auto] md:items-center">
                   <div className="flex gap-3">

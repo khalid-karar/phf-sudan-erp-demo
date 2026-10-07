@@ -343,6 +343,15 @@ Errors look like `{ code, message: { ar, en }, details? }`, so the app can show 
 | Attachments | `GET attachments?ownerType=&ownerId=`, `GET attachments/:id/file` (`?download=1`) | view access to the record's module |
 | | `POST attachments`, `DELETE attachments/:id` (own file, or module manager) | edit access to the record's module |
 
+## Known limits (final review)
+
+Worth knowing before heavy use; none blocks a first deployment.
+- **Retries of money documents.** Payments, advances, settlements, payroll and field reports are safe to retry. Receipt vouchers, manual journal entries and stock receipts/issues have no duplicate guard yet, so the app disables the button while sending; a retry after a timeout should be checked in the list first.
+- **Large histories.** The app loads the latest 500 requests/activities/stock moves and 5,000 journal lines for its screens. Totals on the dashboard and finance pages are computed from those, so for a long-running installation move them to server-side totals.
+- **Excel import** reads the uploaded workbook in memory (2 MB file limit). Only users who can edit activities can upload.
+- **Outgoing email/WhatsApp/SMS hosts** are entered by a settings manager and are only lightly validated.
+- **Offline photos** are kept in the browser's local storage with the queued report; four compressed photos per report keeps this small, but a nearly full phone can still lose the queue on reload.
+
 ## Next phase
 
 These follow the same patterns as the modules above:

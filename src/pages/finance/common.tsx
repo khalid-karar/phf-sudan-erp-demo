@@ -44,9 +44,9 @@ export function JournalEntryModal({ entry, onClose }: { entry: JournalEntry | nu
   const t = entryTotals(entry)
   const dims = (l: JournalEntry['lines'][number]) => {
     const parts: string[] = []
-    if (l.projectId) parts.push(s.projects.find((p) => p.id === l.projectId)!.code)
+    if (l.projectId) parts.push(s.projects.find((p) => p.id === l.projectId)?.code ?? l.projectId)
     if (l.lineId) parts.push(`${ar ? 'بند' : 'line'} ${findLine(s.projects, l.lineId)?.line.code}`)
-    if (l.officeId) parts.push(getOffices().find((o) => o.id === l.officeId)!.name[lang])
+    if (l.officeId) parts.push(getOffices().find((o) => o.id === l.officeId)?.name[lang] ?? l.officeId)
     return parts.join(ar ? '، ' : ', ')
   }
   return (

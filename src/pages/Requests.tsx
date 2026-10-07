@@ -1,3 +1,4 @@
+import { LIVE } from '../api/http'
 import { Check, Circle, Clock, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -171,7 +172,7 @@ export function RequestDetail() {
           <Panel className="p-5">
             <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
               <Item k={t('amount')} v={<span className="num font-kufi text-[22px] font-semibold">{money(r.amount, r.currency, lang)}</span>} sub={r.currency === 'SDG' ? `${usd(r.amountUSD)} — ${ar ? 'السعر' : 'rate'} ${r.rate}` : undefined} />
-              <Item k={t('office')} v={office.name[lang]} sub={office.state[lang]} />
+              <Item k={t('office')} v={office?.name[lang] ?? r.officeId} sub={office?.state[lang]} />
               <Item k={t('project')} v={f.project.name[lang]} sub={f.project.code} />
               <Item k={`${t('pillar')} / ${t('line')}`} v={`${f.line.code} ${f.line.name[lang]}`} sub={`${f.pillar.code}. ${f.pillar.name[lang]}`} />
               <Item k={ar ? 'رقم النشاط' : 'Activity'} v={<span className="num">{r.activityCode ?? '—'}</span>} sub={ar ? 'يُطابق مع التقرير الفني' : 'Matched to the field report'} />
@@ -241,8 +242,8 @@ export function RequestDetail() {
           {r.status === 'pending' && !myTurn && (
             <p className="rounded-md border border-dashed border-line p-4 text-[13.5px] text-muted">
               {ar
-                ? `القرار الآن عند: ${roleNames[r.steps.find((x) => x.status === 'pending')!.role].ar}. بدّل الدور من الأعلى للمتابعة.`
-                : `Waiting on: ${roleNames[r.steps.find((x) => x.status === 'pending')!.role].en}. Switch role at the top to continue.`}
+                ? `القرار الآن عند: ${roleNames[r.steps.find((x) => x.status === 'pending')!.role].ar}.${LIVE ? '' : ' بدّل الدور من الأعلى للمتابعة.'}`
+                : `Waiting on: ${roleNames[r.steps.find((x) => x.status === 'pending')!.role].en}.${LIVE ? '' : ' Switch role at the top to continue.'}`}
             </p>
           )}
         </div>

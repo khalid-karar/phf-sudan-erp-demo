@@ -137,7 +137,7 @@ export const liveActions = {
     const st = useStore.getState()
     const offline = st.offlineSim || (typeof navigator !== 'undefined' && navigator.onLine === false)
     const queue = () => {
-      useStore.setState((s) => ({ outbox: [...s.outbox, { id: `ob-${Date.now()}`, activityId, report: { ...report, via: 'offline' }, savedAt: new Date().toISOString() }] }))
+      useStore.setState((s) => ({ outbox: [...s.outbox, { id: `ob-${Date.now()}`, activityId, report: { ...report, via: 'offline' }, savedAt: new Date().toISOString(), userId: s.userId }] }))
       useStore.getState().toast({ ar: 'لا يوجد اتصال — حُفظ التقرير على الجهاز وسيُرسل تلقائياً عند عودة الإنترنت', en: 'No connection — the report is saved on this device and will be sent automatically when you are back online' }, 'warn')
       return 'queued' as const
     }
@@ -145,11 +145,11 @@ export const liveActions = {
     try {
       await sendReport(activityId, report)
     } catch (e) {
-      if (e instanceof ApiError) {
+      if (e instanceof ApiError && e.status !== 0) {
         useStore.getState().toast(errorText(e), 'bad')
         return null
       }
-      return queue() // the network dropped: keep the work
+      return queue() // the network dropped (or a photo could not be sent yet): keep the work; re-sending is safe
     }
     await refreshData().catch(() => undefined)
     useStore.getState().toast({ ar: 'أُرسل التقرير الفني', en: 'Field report sent' }, 'ok')
@@ -162,11 +162,14 @@ export const liveActions = {
   },
 
   syncOutbox: async () => {
-    const items = useStore.getState().outbox
+    const me = useStore.getState().userId
+    // Only this person's reports, and not ones the server has already refused.
+    const items = useStore.getState().outbox.filter((o) => (!o.userId || o.userId === me) && !o.error)
     if (!items.length || syncing) return
     syncing = true
     let sent = 0
     const done = new Set<string>()
+    const refused = new Map<string, string>()
     try {
       for (const it of items) {
         try {
@@ -174,15 +177,19 @@ export const liveActions = {
           sent++
           done.add(it.id)
         } catch (e) {
-          if (!(e instanceof ApiError)) break // still offline: try again later
+          if (!(e instanceof ApiError) || e.status === 0) break // still offline: try again later
           if (e.status === 409) done.add(it.id) // already filed
-          else useStore.getState().toast(errorText(e), 'bad') // stays in the list so nothing is lost silently
+          else {
+            // Kept in the list so nothing is lost silently, marked so it is not retried (and announced) on every sync.
+            refused.set(it.id, errorText(e).ar)
+            useStore.getState().toast(errorText(e), 'bad')
+          }
         }
       }
     } finally {
       syncing = false
     }
-    if (done.size) useStore.setState((s) => ({ outbox: s.outbox.filter((o) => !done.has(o.id)) }))
+    if (done.size || refused.size) useStore.setState((s) => ({ outbox: s.outbox.filter((o) => !done.has(o.id)).map((o) => (refused.has(o.id) ? { ...o, error: refused.get(o.id) } : o)) }))
     await refreshData().catch(() => undefined)
     if (sent) useStore.getState().toast({ ar: `عاد الاتصال — أُرسل ${sent} تقرير محفوظ`, en: `Back online — ${sent} saved report(s) sent` }, 'ok')
   },
@@ -239,13 +246,13 @@ Object.assign(liveActions, {
     act(() => api.post('/finance/accounts', { code: a.code, parentCode: a.parent, nameAr: a.name.ar, nameEn: a.name.en, postable: a.postable, currency: a.currency ?? 'USD', officeId: a.officeId ?? null }), { ok: { ar: `أُضيف الحساب ${a.code}`, en: `Account ${a.code} added` } }),
   setLineAccount: (lineId: string, code: string) => {
     useStore.setState((s) => ({ lineMap: { ...s.lineMap, [lineId]: code } }))
-    return act(() => api.patch(`/projects/lines/${lineId}`, { expenseAccountCode: code }))
+    return act(() => api.patch(`/projects/lines/${lineId}`, { expenseAccountCode: code })).then((ok) => (ok ? ok : refreshData().then(() => false, () => false))) // a refused change goes back to what the server holds
   },
   addRate: (rate: number) => act(() => api.post('/finance/rates', { date: todayIso(), rate: String(rate), source: 'Manual' }), { ok: { ar: 'سُجّل سعر الصرف', en: 'Exchange rate recorded' } }),
   postRevaluation: () => act(() => api.post('/finance/revaluation', {}), { ok: { ar: 'رُحّل قيد فروق العملة', en: 'FX revaluation entry posted' } }),
   setCashCounted: (officeId: string, v: boolean) => {
     useStore.setState((s) => ({ closes: s.closes.map((c) => (c.officeId === officeId ? { ...c, cashCounted: v } : c)) }))
-    return act(() => api.put(`/finance/close/${closingPeriod()}/${officeId}/cash-counted`, { counted: v }))
+    return act(() => api.put(`/finance/close/${closingPeriod()}/${officeId}/cash-counted`, { counted: v })).then((ok) => (ok ? ok : refreshData().then(() => false, () => false)))
   },
   closeMonth: (officeId: string) => act(() => api.post(`/finance/close/${closingPeriod()}/${officeId}`, {}), { ok: { ar: 'أُقفل الشهر للمكتب', en: 'Month closed for the office' } }),
 })
@@ -375,7 +382,7 @@ Object.assign(liveActions, {
     if (patch.status === 'approved') {
       clearTimeout(draftTimers.get(period))
       return act(() => api.post(`/reports/hq/${period}/approve`), { ok: { ar: 'اعتُمد التقرير', en: 'Report approved' } }).then((ok) => {
-        if (ok) void import('./monthly').then(() => window.dispatchEvent(new CustomEvent('phf:report-changed', { detail: period })))
+        if (ok) window.dispatchEvent(new CustomEvent('phf:report-changed', { detail: period }))
         return ok
       })
     }
@@ -396,7 +403,7 @@ Object.assign(liveActions, {
         } catch (e) {
           useStore.getState().toast(errorText(e), 'bad')
         }
-        window.dispatchEvent(new CustomEvent('phf:report-changed', { detail: period }))
+        window.dispatchEvent(new CustomEvent('phf:report-changed', { detail: period })) // reloads the saved draft, so a refused edit goes back too
       }, 800),
     )
   },
@@ -439,16 +446,19 @@ async function sendReport(activityId: string, r: FieldReport) {
     lon: r.lon,
     via: r.via ?? 'online',
   })
-  for (const [i, p] of (r.photos ?? []).entries()) {
-    try {
+  // Photos already on the server (from an earlier try) are skipped, so re-sending never doubles them. A failure here
+  // throws: the report is filed, but it stays queued until every photo is up.
+  const photos = r.photos ?? []
+  if (photos.length) {
+    const have = (await api.get<unknown[]>(`/attachments?ownerType=field_report&ownerId=${filed.id}`)).length
+    for (const [i, p] of photos.entries()) {
+      if (i < have) continue
       const blob = await (await fetch(p)).blob()
       const f = new FormData()
       f.append('ownerType', 'field_report')
       f.append('ownerId', filed.id)
       f.append('file', blob, `photo-${i + 1}.jpg`)
       await api.upload('/attachments', f)
-    } catch {
-      /* the report is filed; a photo that fails to upload can be added again later */
     }
   }
 }
