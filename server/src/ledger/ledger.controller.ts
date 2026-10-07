@@ -75,8 +75,7 @@ export class LedgerController {
     return this.accounts.setLedgerAccounts(u, b)
   }
 
-  // Exchange rates
-  @Perm('finance', 'view')
+  // Exchange rates: every signed-in person needs the rate to see a spend request in dollars, and it is not confidential.
   @Get('rates')
   rates() {
     return this.accounts.rates()

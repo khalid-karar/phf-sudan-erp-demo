@@ -66,8 +66,8 @@ export function NewRequest() {
     setPurpose(ar ? 'يوم علاجي متنقل — قرية ود شريفي، ريف كسلا (وقود، أدوية، حوافز)' : 'Mobile medical day — Wad Sharifey village, rural Kassala (fuel, medicines, incentives)')
   }
 
-  const submit = () => {
-    const r = s.submitRequest({ officeId, projectId, lineId: line.id, amount: Number(amount), currency, purpose, activityCode: activity })
+  const submit = async () => {
+    const r = await s.submitRequest({ officeId, projectId, lineId: line.id, amount: Number(amount), currency, purpose, activityCode: activity })
     if (r) nav(`/requests/${r.id}`)
   }
 

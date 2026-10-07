@@ -52,15 +52,16 @@ export function ReallocationModal({
   const { chain } = routeApproval(s.rules, 'reallocation', amount)
   const crossPillar = fromF && toF && fromF.pillar.id !== toF.pillar.id
 
-  const submit = () => {
+  const submit = async () => {
     if (!fromF || !toF || tooMuch || amount <= 0) return
-    s.submitReallocation({
+    const made = await s.submitReallocation({
       projectId: project.id,
       fromLineId: fromF.line.id,
       toLineId: toF.line.id,
       amountUSD: amount,
       reason: reason || (ar ? 'تغطية عجز في البند' : 'Cover a shortfall on the line'),
     })
+    if (!made) return
     onDone?.()
     onClose()
   }

@@ -208,15 +208,15 @@ interface State {
     currency: 'SDG' | 'USD'
     purpose: string
     activityCode?: string
-  }) => SpendRequest | null
-  decideRequest: (id: string, approve: boolean, note?: string) => void
+  }) => SpendRequest | null | Promise<SpendRequest | null>
+  decideRequest: (id: string, approve: boolean, note?: string) => void | Promise<boolean>
 
-  submitReallocation: (draft: { projectId: string; fromLineId: string; toLineId: string; amountUSD: number; reason: string }) => Reallocation
-  decideReallocation: (id: string, approve: boolean, note?: string) => void
+  submitReallocation: (draft: { projectId: string; fromLineId: string; toLineId: string; amountUSD: number; reason: string }) => Reallocation | null | Promise<Reallocation | null>
+  decideReallocation: (id: string, approve: boolean, note?: string) => void | Promise<boolean>
 
   updateRule: (id: string, patch: Partial<ApprovalRule>) => void
-  addRule: (kind: ApprovalRule['appliesTo']) => void
-  removeRule: (id: string) => void
+  addRule: (kind: ApprovalRule['appliesTo']) => void | Promise<boolean>
+  removeRule: (id: string) => void | Promise<boolean>
   setProjectControl: (projectId: string, mode: ControlMode, tolerancePct: number) => void
 }
 
@@ -1106,7 +1106,7 @@ export const useStore = create<State>()(
   },
 
   updateRule: (id, patch) => set((s) => ({ rules: s.rules.map((r) => (r.id === id ? { ...r, ...patch } : r)) })),
-  addRule: (kind) =>
+  addRule: (kind) => {
     set((s) => ({
       rules: [
         ...s.rules,
@@ -1121,8 +1121,11 @@ export const useStore = create<State>()(
           active: false,
         },
       ],
-    })),
-  removeRule: (id) => set((s) => ({ rules: s.rules.filter((r) => r.id !== id) })),
+    }))
+  },
+  removeRule: (id) => {
+    set((s) => ({ rules: s.rules.filter((r) => r.id !== id) }))
+  },
   setProjectControl: (projectId, mode, tolerancePct) =>
     set((s) => ({ projects: s.projects.map((p) => (p.id === projectId ? { ...p, controlMode: mode, tolerancePct } : p)) })),
   }),

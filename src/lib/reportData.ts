@@ -26,7 +26,7 @@ const inRange = (iso: string | undefined, a: Date, b: Date) => !!iso && +new Dat
 
 export function monthlyData(s: S, period: string) {
   const { start, end } = periodRange(period)
-  const rate = s.rates.filter((r) => +new Date(r.date) <= +end).at(-1)?.rate ?? s.rates.at(-1)!.rate
+  const rate = s.rates.filter((r) => +new Date(r.date) <= +end).at(-1)?.rate ?? s.rates.at(-1)?.rate ?? 0
   const receipts = s.vouchers.filter((v) => v.kind === 'receipt' && inRange(v.date, start, end))
   const received = receipts.reduce((t, v) => t + v.amountUSD, 0)
   const expenses = s.expenses.filter((e) => inRange(e.date, start, end))
