@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common'
+import { KickNotifications } from '../notifications/kick.interceptor'
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Put, Query, UseInterceptors } from '@nestjs/common'
 import { z } from 'zod'
 import { scopeOffice, type AuthUser } from '../auth/auth-user'
 import { forbidden } from '../common/errors'
@@ -34,6 +35,7 @@ function ownOffice(u: AuthUser, officeId: string) {
   if (limited && limited !== officeId) throw forbidden({ ar: 'هذا المكتب ليس مكتبك', en: 'That is not your office' })
 }
 
+@UseInterceptors(KickNotifications)
 @Controller('finance')
 export class LedgerController {
   constructor(

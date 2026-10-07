@@ -11,6 +11,7 @@ import { hashPassword } from '../auth/passwords'
 import { createDb, createPool, type DbOrTx } from './client'
 import defaults from './defaults.json'
 import * as t from './schema'
+import { DEFAULT_RULES } from '../notifications/events'
 
 export async function bootstrap(db: DbOrTx, o: { adminEmail: string; adminNameAr: string; adminNameEn: string; hqId: string }) {
   const [{ n }] = (await db.execute<{ n: number }>(sql`select count(*)::int as n from roles`)).rows
@@ -30,6 +31,7 @@ export async function bootstrap(db: DbOrTx, o: { adminEmail: string; adminNameAr
   await db.insert(t.accounts).values({ code: '1101-01', parentCode: '1101', nameAr: 'صندوق الرئاسة', nameEn: 'HQ cash box', type: 'asset', currency: 'SDG', officeId: o.hqId })
   await db.insert(t.ledgerAccounts).values(Object.entries(defaults.systemAccounts).map(([key, accountCode]) => ({ key, accountCode })))
   await db.insert(t.approvalRules).values(defaults.rules as (typeof t.approvalRules.$inferInsert)[])
+  await db.insert(t.notifRules).values(DEFAULT_RULES)
 
   const temporaryPassword = `Phf-${randomBytes(4).toString('hex')}9`
   await db.insert(t.users).values({

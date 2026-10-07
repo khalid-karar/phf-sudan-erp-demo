@@ -8,6 +8,7 @@ The backend for the Kuwait Patients Helping Fund (Sudan) ERP. This first phase c
 - spend requests, reallocations and the approval engine
 - field activities and field reports, including offline re-sends
 - the accounting ledger: chart of accounts, vouchers, cash advances, exchange rates, revaluation, month close and reports
+- alerts and notifications: rules, deadlines with an "X days before" warning, in-app inbox, email / WhatsApp / SMS delivery
 - patients: the beneficiary register, services received, duplicate detection and statistics
 - people: employees with project salary shares, leave, and the monthly payroll run
 - supply chain and logistics: item catalogue, stock per store, in-kind receipts, issues to activities, write-offs, shipments between offices, fleet and fuel
@@ -23,7 +24,7 @@ npm run build
 npm run db:migrate                # creates the tables and the ledger guards
 npm run db:seed                   # demo data: same organisation as the clickable demo
 npm run dev                       # http://localhost:3000/health
-npm test                          # 92 tests against a real database (phf_erp_test)
+npm test                          # 111 tests against a real database (phf_erp_test)
 ```
 
 All seeded demo users sign in with the password `Phf-Demo-2026` (change it with `SEED_PASSWORD`). Their emails are in `../src/data/seed.ts`, for example `finance@kphfs.org` (Finance & Admin Manager), `m.osman@kphfs.org` (field officer, Kassala) and `it@kphfs.org` (system administrator).
@@ -177,6 +178,39 @@ Names are compared in a loose form (Arabic variants such as أ/ا, ة/ه, ى/ي 
 
 **Statistics** (`GET patients/stats`): people registered (women, men, children under 18, over 60, displaced), services by type, by office and by month, and how many different people were served. The parts always add up to the total.
 
+### Alerts and notifications
+
+**Rules.** Each rule watches for one kind of situation, says who to tell and by which channels (in the app, email, WhatsApp, SMS), and can be switched off. Eleven rules come with a new installation and all can be changed, duplicated with another number, or deleted:
+
+| Event | Number it takes |
+|---|---|
+| A request reaches someone's approval step | |
+| A request is stuck with an approver | hours |
+| A request is approved, rejected or paid | |
+| A deadline is coming | set on each deadline (days before) |
+| A deadline is missed | |
+| An advance is past its settle-by date | |
+| A field report is overdue | days after the activity |
+| A budget line is near its ceiling | percent of the ceiling |
+| Spending with no field report | days |
+| The monthly close is not finished | day of the month |
+| Stock is below its minimum | |
+
+**Who is told.** "The person concerned" (the approver at that step, the requester, the deadline's owner role, the office team…) plus any roles and named people the rule lists. An office-scoped role only counts for the office the event is about.
+
+**Deadlines.** Each has a due date, an owner role, and how many days before it to warn (`notifyDaysBefore`). The warning goes out once the due date is within that many days, and a missed deadline raises a critical alert. Marking a recurring deadline done creates the next one (monthly, quarterly or yearly; the 31st becomes the last day of a shorter month) with its own warning.
+
+**The engine.** It runs every five minutes (and a few seconds after a request or payment changes), evaluates every enabled rule, and announces each situation once (so a restart or a second server never repeats an alert). Only one server instance evaluates at a time. `POST notification-rules/run` runs it immediately.
+
+**Delivery.** Each message to each person is queued, and a worker sends it:
+- It is claimed first, so two servers never send the same message twice.
+- A failure is retried after 1, 5, 30 and 120 minutes, then marked failed with the reason.
+- A channel that is off, not set up, or a person with no valid email or mobile number gives a "skipped" entry with the reason, so the log always explains why something did not arrive (`GET deliveries`).
+- Email goes through your SMTP server; WhatsApp through the Cloud API with an approved template (two variables: title and text); SMS through Twilio or any HTTPS service. In click-to-chat mode WhatsApp messages are left for a person to send.
+- Links inside messages need `APP_URL`.
+
+**Channel passwords** are encrypted (AES-256-GCM) before they are stored and are never sent back to the screen. Set `SECRETS_KEY` and keep it with your backups; without it, `JWT_SECRET` is used, and changing that would make saved passwords unreadable. A test message can be sent from the settings screen with saved or not-yet-saved settings. The SMS service address must be public https (addresses inside the server's network are refused).
+
 ### Permissions
 
 Every route declares the module and access level it needs, e.g. `@Perm('finance', 'edit')`. On every request, the user and their role are reloaded from the database, so deactivating a user or changing a role takes effect immediately.
@@ -261,11 +295,18 @@ Errors look like `{ code, message: { ar, en }, details? }`, so the app can show 
 | Patients | `GET patients`, `GET patients/:id`, `GET patients/stats` | patients: view |
 | | `POST patients`, `PATCH patients/:id`, `POST patients/:id/services`, `GET patients/duplicates` | patients: edit |
 | | `POST patients/:id/merge` | patients: manage |
+| Alerts | `GET notifications`, `GET notifications/unread-count`, `POST notifications/:id/read`, `POST notifications/read-all` (your own) | signed in |
+| | `GET notification-rules`, `GET deadlines` | alerts: view |
+| | `POST deadlines`, `PATCH deadlines/:id`, `POST deadlines/:id/done` | alerts: edit |
+| | `DELETE deadlines/:id` | alerts: manage |
+| | `POST/PATCH/DELETE notification-rules` | settings: edit |
+| | `POST notification-rules/run` | settings: manage |
+| | `GET deliveries`, `GET channels` | settings: view |
+| | `PUT channels/:channel`, `POST channels/:channel/test` (`email`, `whatsapp`, `sms`) | settings: manage |
 
 ## Next phase
 
 These follow the same patterns as the modules above:
-- notifications engine and email/WhatsApp/SMS delivery
 - HQ report PDF and email sending
 - file attachments for receipts and photos
 - connecting the React app to this API in place of its in-browser data

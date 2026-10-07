@@ -52,6 +52,7 @@ export class Client {
   post = (url: string, body?: object) => this.h(request(this.app.getHttpServer()).post('/api/v1' + url)).send(body ?? {})
   put = (url: string, body?: object) => this.h(request(this.app.getHttpServer()).put('/api/v1' + url)).send(body ?? {})
   patch = (url: string, body?: object) => this.h(request(this.app.getHttpServer()).patch('/api/v1' + url)).send(body ?? {})
+  delete = (url: string) => this.h(request(this.app.getHttpServer()).delete('/api/v1' + url))
 }
 
 export const anon = (app: INestApplication) => request(app.getHttpServer())

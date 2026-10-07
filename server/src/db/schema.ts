@@ -753,3 +753,99 @@ export const beneficiaryServices = pgTable(
   },
   (t) => [index('services_beneficiary_idx').on(t.beneficiaryId, t.date), index('services_office_date_idx').on(t.officeId, t.date)],
 )
+
+// ─── Alerts, deadlines and notifications ─────────────────────────────────────
+
+export const recurrence = pgEnum('recurrence', ['none', 'monthly', 'quarterly', 'yearly'])
+
+export const deadlines = pgTable('deadlines', {
+  id: id(),
+  titleAr: text('title_ar').notNull(),
+  titleEn: text('title_en').notNull(),
+  projectId: text('project_id').references(() => projects.id),
+  due: date('due').notNull(),
+  notifyDaysBefore: integer('notify_days_before').notNull().default(5), // the "X days before" warning
+  ownerRoleId: text('owner_role_id').notNull().references(() => roles.id),
+  recurrence: recurrence('recurrence').notNull().default('none'),
+  done: boolean('done').notNull().default(false),
+  doneAt: ts('done_at'),
+  doneById: text('done_by_id').references(() => users.id),
+  createdById: text('created_by_id').references(() => users.id),
+  createdAt: createdAt(),
+})
+
+/** One row per notification rule: what to watch for, who to tell, and by which channels. */
+export const notifRules = pgTable('notif_rules', {
+  id: id(),
+  event: text('event').notNull(), // see notifications/events.ts
+  nameAr: text('name_ar').notNull(),
+  nameEn: text('name_en').notNull(),
+  threshold: integer('threshold'), // hours, days or percent depending on the event
+  recipients: jsonb('recipients').$type<{ concerned: boolean; roles: string[]; users: string[] }>().notNull(),
+  channels: jsonb('channels').$type<{ inapp: boolean; email: boolean; whatsapp: boolean; sms: boolean }>().notNull(),
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: createdAt(),
+})
+
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: id(),
+    key: text('key').notNull().unique(), // the same situation is only ever announced once
+    ruleId: text('rule_id').references(() => notifRules.id, { onDelete: 'set null' }),
+    event: text('event').notNull(),
+    severity: text('severity').notNull(), // info | warn | critical
+    titleAr: text('title_ar').notNull(),
+    titleEn: text('title_en').notNull(),
+    bodyAr: text('body_ar').notNull().default(''),
+    bodyEn: text('body_en').notNull().default(''),
+    link: text('link'),
+    officeId: text('office_id').references(() => offices.id),
+    inapp: boolean('inapp').notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [index('notifications_created_idx').on(t.createdAt)],
+)
+
+export const notificationRecipients = pgTable(
+  'notification_recipients',
+  {
+    notificationId: text('notification_id').notNull().references(() => notifications.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    readAt: ts('read_at'),
+  },
+  (t) => [primaryKey({ columns: [t.notificationId, t.userId] }), index('notification_recipients_user_idx').on(t.userId, t.readAt)],
+)
+
+export const deliveryChannel = pgEnum('delivery_channel', ['email', 'whatsapp', 'sms'])
+export const deliveryStatus = pgEnum('delivery_status', ['queued', 'sent', 'failed', 'skipped'])
+
+/** An outgoing message to one person by one channel. A worker sends the queued ones, retrying with a delay. */
+export const deliveries = pgTable(
+  'deliveries',
+  {
+    id: id(),
+    notificationId: text('notification_id').references(() => notifications.id, { onDelete: 'cascade' }),
+    userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+    channel: deliveryChannel('channel').notNull(),
+    toAddr: text('to_addr').notNull(),
+    subject: text('subject').notNull(),
+    body: text('body').notNull(),
+    lang: text('lang').notNull().default('ar'),
+    status: deliveryStatus('status').notNull().default('queued'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: ts('next_attempt_at').notNull().defaultNow(),
+    lastError: text('last_error'),
+    createdAt: createdAt(),
+    sentAt: ts('sent_at'),
+  },
+  (t) => [index('deliveries_queue_idx').on(t.status, t.nextAttemptAt)],
+)
+
+/** Email / WhatsApp / SMS settings. Secrets are encrypted before they are stored (see notifications/secrets.ts). */
+export const channelSettings = pgTable('channel_settings', {
+  channel: text('channel').primaryKey(), // email | whatsapp | sms
+  config: jsonb('config').$type<Record<string, unknown>>().notNull(),
+  lastTest: jsonb('last_test').$type<{ at: string; ok: boolean; message: string } | null>(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})

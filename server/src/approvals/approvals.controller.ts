@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common'
+import { KickNotifications } from '../notifications/kick.interceptor'
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseInterceptors } from '@nestjs/common'
 import { z } from 'zod'
 import type { AuthUser } from '../auth/auth-user'
 import { CurrentUser, Perm } from '../auth/decorators'
@@ -9,6 +10,7 @@ import { ApprovalsService } from './approvals.service'
 const previewQuery = z.object({ kind: z.enum(['spend', 'reallocation']).default('spend'), amountUsd: positiveMoney, officeId: z.string().optional() })
 const reallocQuery = z.object({ status: z.enum(['pending', 'approved', 'rejected']).optional(), projectId: z.string().optional() })
 
+@UseInterceptors(KickNotifications)
 @Controller()
 export class ApprovalsController {
   constructor(private readonly svc: ApprovalsService) {}

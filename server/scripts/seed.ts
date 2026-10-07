@@ -18,6 +18,7 @@ import * as demoFin from '../../src/data/finance'
 import * as demoSup from '../../src/data/supply'
 import * as demoPeople from '../../src/data/people'
 import { digits, nameKey } from '../src/patients/names'
+import { DEFAULT_RULES } from '../src/notifications/events'
 import type { JournalEntry } from '../../src/data/types'
 
 const day = (iso: string) => iso.slice(0, 10)
@@ -25,7 +26,7 @@ const cents = (n: number) => toCents(n.toFixed(2))
 
 export async function seed(db: DbOrTx, password: string) {
   await db.execute(sql`
-    truncate beneficiary_services, beneficiaries, payroll_runs, leave_requests, employee_allocations, employees, stock_moves, stock_levels, shipment_lines, shipments, fuel_logs, vehicles, items, audit_log, advance_items, advances, vouchers, period_closes, exchange_rates, journal_lines, journal_entries,
+    truncate deliveries, notification_recipients, notifications, notif_rules, deadlines, channel_settings, beneficiary_services, beneficiaries, payroll_runs, leave_requests, employee_allocations, employees, stock_moves, stock_levels, shipment_lines, shipments, fuel_logs, vehicles, items, audit_log, advance_items, advances, vouchers, period_closes, exchange_rates, journal_lines, journal_entries,
       ledger_accounts, approval_steps, reallocations, spend_requests, field_reports, activities, approval_rules,
       budget_lines, pillars, projects, funds, accounts, refresh_tokens, users, roles, offices, org_settings, doc_counters
     restart identity cascade`)
@@ -314,6 +315,12 @@ export async function seed(db: DbOrTx, password: string) {
       b.services.map((sv) => ({ beneficiaryId: row.id, date: day(sv.date), type: sv.type, officeId: sv.officeId, activityId: sv.activityId ? (activityId.get(demoFin.fieldActivities.find((a) => a.id === sv.activityId)?.code ?? '') ?? null) : null, note: sv.note ?? null })),
     )
   }
+
+  // Alerts: the standard notification rules and the demo's calendar of deadlines.
+  await db.insert(t.notifRules).values(DEFAULT_RULES)
+  await db.insert(t.deadlines).values(
+    s.deadlines.map((d) => ({ titleAr: d.title.ar, titleEn: d.title.en, projectId: d.projectId ?? null, due: day(d.due), notifyDaysBefore: d.notifyDaysBefore, ownerRoleId: d.owner, recurrence: d.recurrence ?? 'none', done: !!d.done })),
+  )
 
   // Continue document numbering after the demo's numbers.
   const maxNo = (codes: string[]) => Math.max(0, ...codes.map((c) => Number(c.split('-').pop()) || 0))
