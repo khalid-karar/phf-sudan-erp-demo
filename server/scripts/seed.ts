@@ -23,7 +23,7 @@ const cents = (n: number) => toCents(n.toFixed(2))
 
 export async function seed(db: DbOrTx, password: string) {
   await db.execute(sql`
-    truncate audit_log, advance_items, advances, vouchers, period_closes, exchange_rates, journal_lines, journal_entries,
+    truncate stock_moves, stock_levels, shipment_lines, shipments, fuel_logs, vehicles, items, audit_log, advance_items, advances, vouchers, period_closes, exchange_rates, journal_lines, journal_entries,
       ledger_accounts, approval_steps, reallocations, spend_requests, field_reports, activities, approval_rules,
       budget_lines, pillars, projects, funds, accounts, refresh_tokens, users, roles, offices, org_settings, doc_counters
     restart identity cascade`)
@@ -207,6 +207,52 @@ export async function seed(db: DbOrTx, password: string) {
     })
   }
 
+  // Supply chain: item catalogue, stock levels, movements, shipments, fleet and fuel logs.
+  await db.insert(t.items).values(
+    demoSup.items.map((i) => ({ id: i.id, code: i.code, nameAr: i.name.ar, nameEn: i.name.en, unitAr: i.unit.ar, unitEn: i.unit.en, category: i.category, unitValue: i.unitValueUSD.toFixed(2), minQty: i.min, expenseAccountCode: demoSup.categoryAccount[i.category], active: i.active ?? true })),
+  )
+  await db.insert(t.vehicles).values(
+    sup.vehicles.map((v) => ({ id: v.id, plate: v.plate, modelAr: v.model.ar, modelEn: v.model.en, kind: v.kind, officeId: v.officeId, driver: v.driver.en, status: v.status, odometer: v.odometer, nextServiceKm: v.nextServiceKm })),
+  )
+  const fuel = sup.vehicles.flatMap((v) => v.fuel.map((f) => ({ id: f.id, vehicleId: v.id, date: day(f.date), liters: f.liters.toFixed(2), costSdg: f.costSDG.toFixed(2), odometer: f.odometer, officeId: f.officeId })))
+  if (fuel.length) await db.insert(t.fuelLogs).values(fuel)
+  const codeById = new Map(demoFin.fieldActivities.map((a) => [a.id, a.code]))
+  const shipmentNos = new Map(sup.shipments.map((x) => [x.id, x.no]))
+  await db.insert(t.shipments).values(
+    sup.shipments.map((x) => ({
+      id: x.id,
+      no: x.no,
+      fromOfficeId: x.fromOfficeId,
+      toOfficeId: x.toOfficeId,
+      vehicleId: x.vehicleId ?? null,
+      driver: x.driver ?? null,
+      status: x.status,
+      note: x.note ?? null,
+      createdAt: new Date(x.createdAt),
+      departedAt: x.departedAt ? new Date(x.departedAt) : null,
+      deliveredAt: x.deliveredAt ? new Date(x.deliveredAt) : null,
+    })),
+  )
+  await db.insert(t.shipmentLines).values(sup.shipments.flatMap((x) => x.lines.map((l) => ({ shipmentId: x.id, itemId: l.itemId, qty: l.qty, received: l.received ?? null }))))
+  const shipmentByNo = new Map([...shipmentNos].map(([id, no]) => [no, id]))
+  await db.insert(t.stockMoves).values(
+    sup.moves.map((m) => ({
+      no: m.no,
+      kind: m.kind,
+      date: day(m.date),
+      itemId: m.itemId,
+      officeId: m.officeId,
+      qty: m.qty,
+      valueUsd: m.valueUSD.toFixed(2),
+      ref: m.ref ?? null,
+      source: m.source?.en ?? null,
+      activityId: m.activityId ? (activityId.get(codeById.get(m.activityId) ?? '') ?? null) : null,
+      shipmentId: m.ref ? (shipmentByNo.get(m.ref) ?? null) : null,
+      expiry: m.expiry ? day(m.expiry) : null,
+    })),
+  )
+  await db.insert(t.stockLevels).values(sup.stock.filter((l) => l.qty > 0).map((l) => ({ itemId: l.itemId, officeId: l.officeId, qty: l.qty })))
+
   // Continue document numbering after the demo's numbers.
   const maxNo = (codes: string[]) => Math.max(0, ...codes.map((c) => Number(c.split('-').pop()) || 0))
   await db.insert(t.docCounters).values([
@@ -215,6 +261,11 @@ export async function seed(db: DbOrTx, password: string) {
     { key: 'ADV', next: maxNo(fin.advances.map((a) => a.no)) + 1 },
     { key: 'PV', next: fin.nextPv },
     { key: 'RV', next: fin.nextRv },
+    { key: 'GRN', next: maxNo(sup.moves.filter((m) => m.kind === 'receipt').map((m) => m.no)) + 1 },
+    { key: 'ISS', next: maxNo(sup.moves.filter((m) => m.kind === 'issue').map((m) => m.no)) + 1 },
+    { key: 'TRF', next: maxNo(sup.moves.filter((m) => m.kind.startsWith('transfer')).map((m) => m.no)) + 1 },
+    { key: 'WO', next: 1 },
+    { key: 'SHP', next: maxNo(sup.shipments.map((x) => x.no)) + 1 },
     { key: 'TR', next: maxNo(demoFin.fieldActivities.filter((a) => a.report).map((a) => a.report!.no)) + 1 },
   ]).onConflictDoUpdate({ target: t.docCounters.key, set: { next: sql`excluded.next` } })
 

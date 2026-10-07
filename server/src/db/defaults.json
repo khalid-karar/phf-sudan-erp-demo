@@ -126,7 +126,7 @@
     "projects": "edit",
     "activities": "edit",
     "finance": "none",
-    "supply": "view",
+    "supply": "edit",
     "logistics": "none",
     "patients": "edit",
     "hr": "none",

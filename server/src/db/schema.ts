@@ -486,3 +486,128 @@ export const ledgerAccounts = pgTable('ledger_accounts', {
   key: text('key').primaryKey(),
   accountCode: text('account_code').notNull().references(() => accounts.code),
 })
+
+// ─── Supply chain & logistics ────────────────────────────────────────────────
+// Stock is tracked per item per store (an office). stock_levels can never go negative (CHECK),
+// and every change is a stock_move, so the quantity can always be explained from the history.
+
+export const itemCategory = pgEnum('item_category', ['nutrition', 'medicine', 'medical_supply', 'equipment'])
+
+export const items = pgTable('items', {
+  id: id(),
+  code: text('code').notNull().unique(),
+  nameAr: text('name_ar').notNull(),
+  nameEn: text('name_en').notNull(),
+  unitAr: text('unit_ar').notNull(),
+  unitEn: text('unit_en').notNull(),
+  category: itemCategory('category').notNull(),
+  unitValue: usd('unit_value').notNull(), // book value per unit, USD
+  minQty: integer('min_qty').notNull().default(0), // per store; below it raises an alert
+  expenseAccountCode: text('expense_account_code').notNull().references(() => accounts.code), // where an issue (or loss) is expensed
+  active: boolean('active').notNull().default(true),
+  createdAt: createdAt(),
+})
+
+export const stockLevels = pgTable(
+  'stock_levels',
+  {
+    itemId: text('item_id').notNull().references(() => items.id),
+    officeId: text('office_id').notNull().references(() => offices.id),
+    qty: integer('qty').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.itemId, t.officeId] }), check('stock_levels_non_negative', sql`${t.qty} >= 0`)],
+)
+
+export const moveKind = pgEnum('move_kind', ['receipt', 'issue', 'transfer_out', 'transfer_in', 'loss'])
+
+export const stockMoves = pgTable(
+  'stock_moves',
+  {
+    id: id(),
+    no: text('no').notNull(),
+    kind: moveKind('kind').notNull(),
+    date: date('date').notNull(),
+    itemId: text('item_id').notNull().references(() => items.id),
+    officeId: text('office_id').notNull().references(() => offices.id),
+    qty: integer('qty').notNull(), // always positive; kind gives the direction
+    valueUsd: usd('value_usd').notNull(),
+    ref: text('ref'),
+    source: text('source'), // donor / sender for receipts, reason for losses
+    activityId: text('activity_id').references(() => activities.id),
+    shipmentId: text('shipment_id'),
+    expiry: date('expiry'),
+    entryId: text('entry_id').references(() => journalEntries.id),
+    createdById: text('created_by_id').references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [index('stock_moves_item_office').on(t.itemId, t.officeId), index('stock_moves_activity').on(t.activityId), check('stock_moves_positive', sql`${t.qty} > 0`)],
+)
+
+export const vehicleKind = pgEnum('vehicle_kind', ['pickup', 'suv', 'truck', 'ambulance'])
+export const vehicleStatus = pgEnum('vehicle_status', ['available', 'on_trip', 'maintenance'])
+
+export const vehicles = pgTable('vehicles', {
+  id: id(),
+  plate: text('plate').notNull().unique(),
+  modelAr: text('model_ar').notNull(),
+  modelEn: text('model_en').notNull(),
+  kind: vehicleKind('kind').notNull(),
+  officeId: text('office_id').notNull().references(() => offices.id),
+  driver: text('driver'),
+  status: vehicleStatus('status').notNull().default('available'),
+  odometer: integer('odometer').notNull().default(0),
+  nextServiceKm: integer('next_service_km'),
+  active: boolean('active').notNull().default(true),
+  createdAt: createdAt(),
+})
+
+export const fuelLogs = pgTable(
+  'fuel_logs',
+  {
+    id: id(),
+    vehicleId: text('vehicle_id').notNull().references(() => vehicles.id),
+    date: date('date').notNull(),
+    liters: numeric('liters', { precision: 10, scale: 2 }).notNull(),
+    costSdg: sdg('cost_sdg').notNull(),
+    odometer: integer('odometer').notNull(),
+    officeId: text('office_id').notNull().references(() => offices.id),
+    createdById: text('created_by_id').references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [index('fuel_logs_vehicle').on(t.vehicleId, t.date)],
+)
+
+export const shipmentStatus = pgEnum('shipment_status', ['preparing', 'in_transit', 'delivered'])
+
+export const shipments = pgTable(
+  'shipments',
+  {
+    id: id(),
+    no: text('no').notNull().unique(),
+    fromOfficeId: text('from_office_id').notNull().references(() => offices.id),
+    toOfficeId: text('to_office_id').notNull().references(() => offices.id),
+    vehicleId: text('vehicle_id').references(() => vehicles.id),
+    driver: text('driver'),
+    status: shipmentStatus('status').notNull().default('preparing'),
+    note: text('note'),
+    createdById: text('created_by_id').references(() => users.id),
+    createdAt: createdAt(),
+    departedAt: ts('departed_at'),
+    deliveredAt: ts('delivered_at'),
+    receivedById: text('received_by_id').references(() => users.id),
+    sentEntryId: text('sent_entry_id'),
+  },
+  (t) => [index('shipments_status').on(t.status), check('shipments_different_offices', sql`${t.fromOfficeId} <> ${t.toOfficeId}`)],
+)
+
+export const shipmentLines = pgTable(
+  'shipment_lines',
+  {
+    id: id(),
+    shipmentId: text('shipment_id').notNull().references(() => shipments.id, { onDelete: 'cascade' }),
+    itemId: text('item_id').notNull().references(() => items.id),
+    qty: integer('qty').notNull(),
+    received: integer('received'), // set on delivery; may be less than qty (damage, loss)
+  },
+  (t) => [uniqueIndex('shipment_lines_unique').on(t.shipmentId, t.itemId), check('shipment_lines_qty', sql`${t.qty} > 0 and (${t.received} is null or (${t.received} >= 0 and ${t.received} <= ${t.qty}))`)],
+)

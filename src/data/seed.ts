@@ -123,7 +123,7 @@ export const roles: Role[] = [
     id: 'field_officer',
     name: { ar: 'مسؤول ميداني', en: 'Field officer' },
     description: { ar: 'يقدّم طلبات الصرف والتقارير الفنية لمكتبه', en: 'Submits spend requests and field reports for their office' },
-    permissions: perms({ projects: 'edit', activities: 'edit', supply: 'view', patients: 'edit' }),
+    permissions: perms({ projects: 'edit', activities: 'edit', supply: 'edit', patients: 'edit' }),
     scope: 'office',
     canApprove: false,
     system: true,

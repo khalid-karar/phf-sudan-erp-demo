@@ -8,6 +8,7 @@ The backend for the Kuwait Patients Helping Fund (Sudan) ERP. This first phase c
 - spend requests, reallocations and the approval engine
 - field activities and field reports, including offline re-sends
 - the accounting ledger: chart of accounts, vouchers, cash advances, exchange rates, revaluation, month close and reports
+- supply chain and logistics: item catalogue, stock per store, in-kind receipts, issues to activities, write-offs, shipments between offices, fleet and fuel
 
 Stack: Node 22, NestJS 11, PostgreSQL 16, Drizzle ORM. Everything is plain JavaScript plus PostgreSQL, so nothing extra has to be downloaded on the server.
 
@@ -20,7 +21,7 @@ npm run build
 npm run db:migrate                # creates the tables and the ledger guards
 npm run db:seed                   # demo data: same organisation as the clickable demo
 npm run dev                       # http://localhost:3000/health
-npm test                          # 44 tests against a real database (phf_erp_test)
+npm test                          # 60 tests against a real database (phf_erp_test)
 ```
 
 All seeded demo users sign in with the password `Phf-Demo-2026` (change it with `SEED_PASSWORD`). Their emails are in `../src/data/seed.ts`, for example `finance@kphfs.org` (Finance & Admin Manager), `m.osman@kphfs.org` (field officer, Kassala) and `it@kphfs.org` (system administrator).
@@ -121,6 +122,26 @@ An advance remembers the currency it was handed out in, the amount and the issue
 
 Field reports are idempotent by `clientId`. A phone that re-sends the same offline report does not create a duplicate.
 
+### Supply chain and stock
+
+Stock is kept per item per store (an office). Every change is a stock movement, and `stock_levels` has a database check that it can never go negative. Taking stock out is one guarded update, so two people issuing the last cartons at the same moment cannot both succeed.
+
+| Action | Stock | Books (source `stock` / `transfer`) |
+|---|---|---|
+| Receipt (in-kind replenishment) | + at the receiving store | Dr Inventory, Cr In-kind revenue |
+| Issue to an activity | − at the store | Dr item's expense account (tagged to the activity's project and budget line), Cr Inventory |
+| Write-off (damage, expiry) | − at the store | Dr item's expense account, Cr Inventory |
+| Shipment dispatched | − at the sending store | nothing yet: the goods are on the road |
+| Shipment received | + at the receiving store, for what actually arrived | Dr Inventory (receiving office) and Dr expense for any shortage, Cr Inventory (sending office) |
+
+Items are valued at their book value per unit. An in-kind issue shows on the budget line as `inKind` and never counts against the cash ceiling.
+
+Because books move on receipt, **stock value on hand + value of shipments in transit = the inventory account**. A test checks this after every kind of movement.
+
+Only the sending office can dispatch a shipment and only the receiving office can confirm it. A vehicle on a trip is set free when its shipment is received. Quantities are whole units.
+
+The alerts endpoint lists items below their minimum, received batches nearing expiry while the store still holds that item (batches are not tracked separately), and vehicles close to their service mileage.
+
 ### Permissions
 
 Every route declares the module and access level it needs, e.g. `@Perm('finance', 'edit')`. On every request, the user and their role are reloaded from the database, so deactivating a user or changing a role takes effect immediately.
@@ -187,11 +208,19 @@ Errors look like `{ code, message: { ar, en }, details? }`, so the app can show 
 | | `PUT finance/close/:period/:office/cash-counted` | finance: edit |
 | | `POST finance/close/:period/:office`, `POST finance/close/:period/:office/reopen` | finance: manage |
 | Reports | `GET finance/reports/trial-balance`, `GET finance/reports/activities`, `GET finance/reports/budget-vs-actual/:projectId` | finance: view |
+| Supply: items | `GET supply/items` | supply: view |
+| | `POST supply/items`, `PATCH supply/items/:id` | supply: manage |
+| Supply: stock | `GET supply/stock`, `GET supply/moves`, `GET supply/alerts` | supply: view |
+| | `POST supply/receipts`, `POST supply/issues`, `POST supply/write-offs` | supply: edit |
+| Shipments | `GET supply/shipments`, `GET supply/shipments/:id` | supply: view |
+| | `POST supply/shipments`, `POST supply/shipments/:id/dispatch`, `POST supply/shipments/:id/receive` | supply: edit |
+| Fleet | `GET logistics/vehicles`, `GET logistics/vehicles/:id`, `GET logistics/consumption` | logistics: view |
+| | `POST logistics/vehicles` | logistics: manage |
+| | `PATCH logistics/vehicles/:id`, `POST logistics/vehicles/:id/fuel` | logistics: edit |
 
 ## Next phase
 
 These follow the same patterns as the modules above:
-- supply chain and logistics (stock, receipts, issues, shipments, fleet)
 - HR and payroll posting
 - beneficiaries
 - notifications engine and email/WhatsApp/SMS delivery
