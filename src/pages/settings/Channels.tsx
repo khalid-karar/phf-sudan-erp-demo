@@ -17,13 +17,13 @@ const emailPresets: Record<ChannelConfig['email']['provider'], { name: Bi2; host
 const guides: Record<string, { ar: string[]; en: string[] }> = {
   microsoft365: {
     ar: [
-      'أنشئ صندوق بريد للإرسال مثل notifications@kphfs.org في مركز إدارة Microsoft 365.',
+      'أنشئ صندوق بريد للإرسال مثل notifications@phfsudan.org في مركز إدارة Microsoft 365.',
       'من: المستخدمون ← اختر الحساب ← البريد ← إدارة تطبيقات البريد، فعّل «Authenticated SMTP».',
       'إذا كان التحقق الثنائي مفعّلاً على الحساب، أنشئ كلمة مرور تطبيقات واستخدمها هنا.',
       'اختر Microsoft 365 أعلاه، أدخل البريد وكلمة المرور، ثم أرسل رسالة تجريبية.',
     ],
     en: [
-      'Create a sending mailbox such as notifications@kphfs.org in the Microsoft 365 admin center.',
+      'Create a sending mailbox such as notifications@phfsudan.org in the Microsoft 365 admin center.',
       'Go to Users → select the account → Mail → Manage email apps, and turn on “Authenticated SMTP”.',
       'If the account uses two-step verification, create an app password and use it here.',
       'Pick Microsoft 365 above, enter the email and password, then send a test message.',
@@ -42,8 +42,8 @@ const guides: Record<string, { ar: string[]; en: string[] }> = {
     ],
   },
   sendgrid: {
-    ar: ['أنشئ حساب SendGrid ووثّق نطاق البريد kphfs.org.', 'من Settings ← API Keys أنشئ مفتاحاً بصلاحية Mail Send.', 'اسم المستخدم: apikey، وكلمة المرور: المفتاح. ثم أرسل رسالة تجريبية.'],
-    en: ['Create a SendGrid account and verify the kphfs.org domain.', 'Under Settings → API Keys, create a key with Mail Send access.', 'Username: apikey; password: the key. Then send a test.'],
+    ar: ['أنشئ حساب SendGrid ووثّق نطاق البريد phfsudan.org.', 'من Settings ← API Keys أنشئ مفتاحاً بصلاحية Mail Send.', 'اسم المستخدم: apikey، وكلمة المرور: المفتاح. ثم أرسل رسالة تجريبية.'],
+    en: ['Create a SendGrid account and verify the phfsudan.org domain.', 'Under Settings → API Keys, create a key with Mail Send access.', 'Username: apikey; password: the key. Then send a test.'],
   },
   smtp: {
     ar: ['اطلب من مزوّد الاستضافة: عنوان خادم SMTP، المنفذ، نوع التشفير.', 'المنفذ 465 يعمل مع SSL، والمنفذ 587 مع STARTTLS.', 'أدخل حساب الإرسال وكلمة مروره، ثم أرسل رسالة تجريبية.'],
@@ -260,7 +260,7 @@ export function Channels() {
             </div>
             <div className="grid gap-4 sm:grid-cols-[1fr_110px_150px]">
               <Field label={ar ? 'خادم الإرسال (SMTP)' : 'Outgoing server (SMTP)'}>
-                <input className={inputCls} dir="ltr" value={E.host} onChange={(e) => setE({ host: e.target.value.trim() })} placeholder="mail.kphfs.org" />
+                <input className={inputCls} dir="ltr" value={E.host} onChange={(e) => setE({ host: e.target.value.trim() })} placeholder="mail.phfsudan.org" />
               </Field>
               <Field label={ar ? 'المنفذ' : 'Port'}>
                 <input className={`${inputCls} num`} dir="ltr" type="number" value={E.port} onChange={(e) => setE({ port: +e.target.value })} />
@@ -290,7 +290,7 @@ export function Channels() {
                 <input className={inputCls} dir="ltr" value={E.replyTo} onChange={(e) => setE({ replyTo: e.target.value.trim() })} />
               </Field>
             </div>
-            {testRow('email', 'name@kphfs.org')}
+            {testRow('email', 'name@phfsudan.org')}
             <Guide title={ar ? `خطوات الإعداد لقسم تقنية المعلومات — ${emailPresets[E.provider].name.ar}` : `Setup steps for IT — ${emailPresets[E.provider].name.en}`} steps={guides[E.provider][lang]} />
           </>,
         )}

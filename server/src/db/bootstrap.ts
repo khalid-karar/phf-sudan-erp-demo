@@ -18,8 +18,8 @@ export async function bootstrap(db: DbOrTx, o: { adminEmail: string; adminNameAr
   if (n > 0) return { skipped: true as const }
 
   await db.insert(t.orgSettings).values({
-    nameAr: 'صندوق إعانة المرضى الكويتي — السودان',
-    nameEn: 'Kuwait Patients Helping Fund — Sudan',
+    nameAr: 'صندوق إعانة المرضى — السودان',
+    nameEn: 'Patients Helping Fund — Sudan',
     shortNameAr: 'نظام إدارة الموارد',
     shortNameEn: 'Resource Management System',
     hqNameAr: 'المقر الرئيسي — دولة الكويت',

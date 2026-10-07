@@ -38,7 +38,7 @@ export const DocHeader = forwardRef<HTMLDivElement, { org: OrgSettings; title: s
   return (
     <div ref={ref} dir={lang === 'ar' ? 'rtl' : 'ltr'} style={{ width: PAGE_W }} className="flex items-center justify-between bg-white px-10 pt-4 pb-2 font-plex">
       <div className="flex items-center gap-2.5">
-        <img src={org.logo} alt="" className="size-9 rounded-full object-cover" />
+        <img src={org.logo} alt="" className="h-9 w-auto object-contain" />
         <div className="leading-tight">
           <div className="text-[12px] font-semibold text-nile">{org.name[lang]}</div>
           <div className="text-[10.5px] text-muted">{org.shortName[lang]}</div>
@@ -83,7 +83,7 @@ export function HqReportDoc({
       <Block className="pt-8">
         <div className="flex items-start justify-between gap-6">
           <div className="flex items-center gap-3">
-            <img src={org.logo} alt="" className="size-16 rounded-full object-cover ring-2 ring-nile/20" />
+            <img src={org.logo} alt="" className="h-16 w-auto object-contain" />
             <div className="leading-tight">
               <div className="font-kufi text-[15px] font-bold text-nile">{org.name[lang]}</div>
               <div className="text-[11.5px] text-muted">{org.shortName[lang]}</div>

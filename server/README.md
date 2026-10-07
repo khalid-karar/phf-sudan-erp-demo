@@ -1,6 +1,6 @@
 # PHF Sudan ERP — API server
 
-The backend for the Kuwait Patients Helping Fund (Sudan) ERP. This first phase covers the core that everything else builds on:
+The backend for the Patients Helping Fund (Sudan) ERP. This first phase covers the core that everything else builds on:
 
 - sign-in, roles and permissions
 - offices, users and roles administration
@@ -28,11 +28,11 @@ npm run dev                       # http://localhost:3000/health
 npm test                          # 123 tests against a real database (phf_erp_test)
 ```
 
-All seeded demo users sign in with the password `Phf-Demo-2026` (change it with `SEED_PASSWORD`). Their emails are in `../src/data/seed.ts`, for example `finance@kphfs.org` (Finance & Admin Manager), `m.osman@kphfs.org` (field officer, Kassala) and `it@kphfs.org` (system administrator).
+All seeded demo users sign in with the password `Phf-Demo-2026` (change it with `SEED_PASSWORD`). Their emails are in `../src/data/seed.ts`, for example `finance@phfsudan.org` (Finance & Admin Manager), `m.osman@phfsudan.org` (field officer, Kassala) and `it@phfsudan.org` (system administrator).
 
 ## Deploy on the Saudi server
 
-The server needs Docker, and a domain name (e.g. `api.erp.kphfs.org`) whose DNS points at it.
+The server needs Docker, and a domain name (e.g. `api.erp.phfsudan.org`) whose DNS points at it.
 
 ```bash
 git clone https://github.com/khalid-karar/phf-sudan-erp-demo.git && cd phf-sudan-erp-demo/server

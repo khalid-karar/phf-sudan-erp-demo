@@ -107,11 +107,12 @@ function Sidebar({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed
   return (
     <nav className="flex h-full flex-col bg-nile text-white" aria-label={lang === 'ar' ? 'القائمة الرئيسية' : 'Main menu'}>
       <div className={`flex items-center gap-3 pt-5 pb-4 ${collapsed ? 'justify-center px-2' : 'px-5'}`}>
-        <img src={org.logo} alt="" className="size-10 shrink-0 rounded-full bg-white object-cover ring-2 ring-white/20" />
-        {!collapsed && (
-          <div className="min-w-0 leading-tight">
-            <div className="truncate font-kufi text-[14.5px] font-semibold">{org.shortName[lang]}</div>
-            <div className="mt-0.5 line-clamp-2 text-[11.5px] text-white/60">{org.name[lang]}</div>
+        {collapsed ? (
+          <img src={org.logo} alt={org.name[lang]} className="size-10 shrink-0 rounded-md bg-white object-cover object-left" />
+        ) : (
+          <div className="min-w-0 flex-1 rounded-lg bg-white px-2 py-1.5">
+            <img src={org.logo} alt={org.name[lang]} className="mx-auto h-11 w-auto max-w-full object-contain" />
+            <div className="mt-0.5 text-center text-[10.5px] font-medium text-nile">{lang === 'ar' ? 'السودان' : 'Sudan'}</div>
           </div>
         )}
       </div>

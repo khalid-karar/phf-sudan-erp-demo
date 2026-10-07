@@ -11,7 +11,7 @@ const schema = z.object({
   TRUST_PROXY: z.enum(['true', 'false', '1', '0']).default('false').transform((v) => v === 'true' || v === '1'),
   // Key for encrypting channel passwords and tokens at rest. When unset it is derived from JWT_SECRET.
   SECRETS_KEY: z.string().min(32, 'SECRETS_KEY must be at least 32 characters').optional(),
-  // Where people open the app, used for links inside emails and messages (e.g. https://erp.kphfs.org).
+  // Where people open the app, used for links inside emails and messages (e.g. https://erp.phfsudan.org).
   APP_URL: z.string().url().optional(),
   // Where uploaded files (receipts, photos, reports) are kept. In docker this is a volume that is backed up.
   UPLOAD_DIR: z.string().default('./uploads'),
