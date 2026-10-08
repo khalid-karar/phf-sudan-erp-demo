@@ -1,11 +1,12 @@
 import { AlertTriangle, CheckCircle2, CircleAlert, Shuffle, Wand2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ReallocationModal } from '../components/ReallocationModal'
 import { Button, Field, inputCls, PageHeader, Panel, UsageBar } from '../components/ui'
 import { roleNames } from '../data/seed'
 import { checkCeiling, routeApproval, type Level } from '../lib/budget'
 import { num, sdg, usd } from '../lib/format'
+import { wordsAr, wordsEn } from '../lib/words'
 import { useLang } from '../lib/i18n'
 import { getOffices, usePerm, useStore, useUser } from '../lib/store'
 
@@ -39,6 +40,7 @@ export function NewRequest() {
   const fromAct = s.activities.find((x) => x.code === params.get('activity'))
   const [currency, setCurrency] = useState<'SDG' | 'USD'>(params.get('amount') ? 'USD' : 'SDG')
   const [amount, setAmount] = useState<number | ''>(params.get('amount') ? +params.get('amount')! || '' : '')
+  const [amountText, setAmountText] = useState(params.get('amount') ? groupDigits(String(+params.get('amount')! || '')) : '')
   const [purpose, setPurpose] = useState(fromAct ? fromAct.title[lang] : '')
   const [activity, setActivity] = useState(params.get('activity') ?? '')
   const [realloc, setRealloc] = useState(false)
@@ -62,8 +64,28 @@ export function NewRequest() {
     setOfficeId('ksl')
     setCurrency('SDG')
     setAmount(4_500_000)
+    setAmountText(groupDigits('4500000'))
     setActivity('ACT-KSL-0142')
     setPurpose(ar ? 'يوم علاجي متنقل — قرية ود شريفي، ريف كسلا (وقود، أدوية، حوافز)' : 'Mobile medical day — Wad Sharifey village, rural Kassala (fuel, medicines, incentives)')
+  }
+
+  const officeActivities = useMemo(
+    () => s.activities.filter((x) => x.officeId === officeId).sort((a, b) => +new Date(b.date) - +new Date(a.date)),
+    [s.activities, officeId],
+  )
+  const pickActivity = (code: string) => {
+    setActivity(code)
+    const a = s.activities.find((x) => x.code === code)
+    if (!a) return
+    // The activity already knows its project and budget line — fill them in so nothing is typed twice.
+    const pj = s.projects.find((p) => p.id === a.projectId)
+    const pl = pj?.pillars.find((p) => p.lines.some((l) => l.id === a.lineId))
+    if (pj && pl) {
+      setProjectId(pj.id)
+      setPillarId(pl.id)
+      setLineId(a.lineId)
+    }
+    if (!purpose.trim()) setPurpose(a.title[lang])
   }
 
   const submit = async () => {
@@ -150,22 +172,35 @@ export function NewRequest() {
             <Field
               label={ar ? 'المبلغ' : 'Amount'}
               hint={
-                currency === 'SDG' && amountUSD > 0
-                  ? ar
-                    ? `≈ ${usd(amountUSD)} بسعر ${num(SDG_RATE)} ج.س للدولار (سعر اليوم)`
-                    : `≈ ${usd(amountUSD)} at ${num(SDG_RATE)} SDG per USD (today’s rate)`
-                  : currency === 'USD' && amountUSD > 0
-                    ? `≈ ${sdg(amountUSD * SDG_RATE, lang)}`
-                    : undefined
+                amountUSD > 0 ? (
+                  <>
+                    {currency === 'SDG'
+                      ? ar
+                        ? `≈ ${usd(amountUSD)} بسعر ${num(SDG_RATE)} ج.س للدولار (سعر اليوم)`
+                        : `≈ ${usd(amountUSD)} at ${num(SDG_RATE)} SDG per USD (today’s rate)`
+                      : `≈ ${sdg(amountUSD * SDG_RATE, lang)}`}
+                    <span className="mt-0.5 block">
+                      {ar ? 'كتابةً: ' : 'In words: '}
+                      {ar ? `${wordsAr(Number(amount))} ${currency === 'SDG' ? 'جنيه سوداني' : 'دولار أمريكي'}` : `${wordsEn(Number(amount))} ${currency === 'SDG' ? 'Sudanese pounds' : 'US dollars'}`}
+                    </span>
+                  </>
+                ) : undefined
               }
             >
               <input
-                type="number"
-                min={0}
+                type="text"
                 inputMode="decimal"
-                className={`${inputCls} num`}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value === '' ? '' : Math.max(0, +e.target.value))}
+                autoComplete="off"
+                dir="ltr"
+                className={`${inputCls} num text-end`}
+                value={amountText}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^0-9.]/g, '')
+                  const [i = '', ...rest] = raw.split('.')
+                  const cleaned = rest.length ? `${i}.${rest.join('').slice(0, 2)}` : i
+                  setAmountText(groupDigits(cleaned))
+                  setAmount(cleaned === '' || cleaned === '.' ? '' : Math.max(0, parseFloat(cleaned) || 0))
+                }}
                 placeholder="0"
               />
             </Field>
@@ -188,19 +223,25 @@ export function NewRequest() {
             <textarea className={`${inputCls} h-20 py-2`} value={purpose} onChange={(e) => setPurpose(e.target.value)} />
           </Field>
           <Field
-            label={ar ? 'رقم النشاط' : 'Activity number'}
-            hint={ar ? 'يربط هذا الصرف بالتقرير الفني للنشاط نفسه — أساس المطابقة.' : 'Links this spend to the same activity’s field report — the basis of matching.'}
+            label={ar ? 'النشاط' : 'Activity'}
+            hint={
+              <>
+                {ar ? 'يربط هذا الصرف بالتقرير الفني للنشاط نفسه — أساس المطابقة. ' : 'Links this spend to the same activity’s field report — the basis of matching. '}
+                <Link to="/activities" className="text-nile underline">
+                  {ar ? 'لا تجد نشاطك؟ أنشئ نشاطاً جديداً' : 'Can’t find it? Create a new activity'}
+                </Link>
+              </>
+            }
           >
-            <input className={`${inputCls} num`} value={activity} onChange={(e) => setActivity(e.target.value)} placeholder="ACT-KSL-0142" dir="ltr" list="acts" />
-            <datalist id="acts">
-              {s.activities
-                .filter((x) => x.officeId === officeId)
-                .map((x) => (
-                  <option key={x.id} value={x.code}>
-                    {x.title[lang]}
-                  </option>
-                ))}
-            </datalist>
+            <select className={inputCls} value={activity} onChange={(e) => pickActivity(e.target.value)}>
+              <option value="">{ar ? '— اختر النشاط —' : '— Choose the activity —'}</option>
+              {activity && !officeActivities.some((x) => x.code === activity) && <option value={activity}>{activity}</option>}
+              {officeActivities.map((x) => (
+                <option key={x.id} value={x.code}>
+                  {x.title[lang]} — {x.code}
+                </option>
+              ))}
+            </select>
           </Field>
         </Panel>
 
@@ -280,4 +321,11 @@ export function NewRequest() {
       <ReallocationModal open={realloc} onClose={() => setRealloc(false)} project={project} toLineId={line.id} suggested={check.shortfall} />
     </div>
   )
+}
+
+/** "4500000" → "4,500,000" (keeps a decimal part while typing). */
+function groupDigits(raw: string) {
+  const [i = '', d] = raw.split('.')
+  const g = i.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return d === undefined ? g : `${g}.${d}`
 }

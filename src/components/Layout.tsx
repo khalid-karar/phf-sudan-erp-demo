@@ -27,7 +27,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import type { Access, ModuleKey } from '../data/types'
 import { useT } from '../lib/i18n'
 import { Tour } from './Help'
-import { helpItem, locate, modules, type NavItem, type NavModule } from '../lib/nav'
+import { badgeMeaning, helpItem, locate, modules, type NavItem, type NavModule } from '../lib/nav'
 import { useStore, usePerm, useUser } from '../lib/store'
 import { CommandPalette } from './CommandPalette'
 import { NotificationBell } from './NotificationBell'
@@ -84,9 +84,17 @@ export function useBadges() {
   return counts
 }
 
-function Badge({ n, quiet }: { n: number; quiet?: boolean }) {
+/** Tooltip for the number on a collapsed menu group: which pages inside it are asking for attention. */
+function moduleBadgeLabel(m: NavModule, lang: 'ar' | 'en') {
+  return m.items
+    .filter((it) => it.badge && it.badge !== 'awaitingPay' && it.badge !== 'offline')
+    .map((it) => `${it.label[lang]}: ${badgeMeaning[it.badge!][lang]}`)
+    .join('\n')
+}
+
+function Badge({ n, quiet, label }: { n: number; quiet?: boolean; label?: string }) {
   if (!n) return null
-  return <span className={`num min-w-5 rounded-full px-1.5 text-center text-[11.5px] font-semibold leading-5 ${quiet ? 'bg-white/15 text-white' : 'bg-crescent text-white'}`}>{n}</span>
+  return <span title={label} className={`num min-w-5 rounded-full px-1.5 text-center text-[11.5px] font-semibold leading-5 ${quiet ? 'bg-white/15 text-white' : 'bg-crescent text-white'}`}>{n}</span>
 }
 
 function Sidebar({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed?: boolean }) {
@@ -149,7 +157,7 @@ function Sidebar({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed
                 {!collapsed && (
                   <>
                     <span className="flex-1 truncate text-start font-medium">{m.label[lang]}</span>
-                    {!isOpen && <Badge n={b} />}
+                    {!isOpen && <Badge n={b} label={moduleBadgeLabel(m, lang)} />}
                     {!single && <ChevronDown size={15} className={`shrink-0 text-white/50 transition-transform ${isOpen ? 'rotate-180' : ''}`} />}
                   </>
                 )}
@@ -167,7 +175,7 @@ function Sidebar({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed
                       }
                     >
                       <span className="flex-1 truncate">{it.label[lang]}</span>
-                      {it.badge && <Badge n={badges[it.badge]} quiet={quiet(it)} />}
+                      {it.badge && <Badge n={badges[it.badge]} quiet={quiet(it)} label={badgeMeaning[it.badge][lang]} />}
                     </NavLink>
                   ))}
                 </div>
@@ -223,7 +231,7 @@ function ModuleTabs({ always }: { always?: boolean }) {
           }
         >
           {it.label[lang]}
-          {it.badge && badges[it.badge] > 0 && <span className="num rounded-full bg-crescent px-1.5 text-[11px] leading-[18px] text-white">{badges[it.badge]}</span>}
+          {it.badge && badges[it.badge] > 0 && <span title={badgeMeaning[it.badge][lang]} className="num rounded-full bg-crescent px-1.5 text-[11px] leading-[18px] text-white">{badges[it.badge]}</span>}
         </NavLink>
       ))}
     </div>

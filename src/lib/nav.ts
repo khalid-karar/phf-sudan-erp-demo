@@ -138,6 +138,17 @@ export const modules: NavModule[] = [
   },
 ]
 
+/** What each red number in the menu counts — shown as a tooltip so nobody has to guess. */
+export const badgeMeaning: Record<NonNullable<NavItem['badge']>, Bi> = {
+  approvals: { ar: 'طلبات بانتظار اعتمادك', en: 'Requests waiting for your approval' },
+  awaitingPay: { ar: 'طلبات معتمدة بانتظار الدفع', en: 'Approved requests waiting to be paid' },
+  overdueAdv: { ar: 'عُهد تجاوزت موعد التسوية', en: 'Advances past their settlement date' },
+  unread: { ar: 'تنبيهات غير مقروءة', en: 'Unread notifications' },
+  gaps: { ar: 'مصروفات بلا تقرير فني (آخر 60 يوماً)', en: 'Expenses with no field report (last 60 days)' },
+  lowStock: { ar: 'أصناف تحت حد إعادة الطلب', en: 'Items below their reorder level' },
+  offline: { ar: 'تقارير محفوظة على الجهاز بانتظار الإرسال', en: 'Reports saved on this device, waiting to be sent' },
+}
+
 export const helpItem: NavItem = { to: '/help', label: { ar: 'مركز المساعدة', en: 'Help centre' } }
 
 /** Finds the module and page for a path (longest matching prefix wins). */

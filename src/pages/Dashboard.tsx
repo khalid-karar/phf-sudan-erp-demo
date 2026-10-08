@@ -12,6 +12,7 @@ import { date, daysUntil, relDays, usd } from '../lib/format'
 import { useLang } from '../lib/i18n'
 import { getOffices, usePerm, useStore, useUser } from '../lib/store'
 import { useVisibleNav } from '../components/Layout'
+import { FieldDashboard } from './FieldDashboard'
 
 const statusLabel: Record<SiteStatus, { ar: string; en: string }> = {
   good: { ar: 'مطابق', en: 'Matched' },
@@ -21,7 +22,14 @@ const statusLabel: Record<SiteStatus, { ar: string; en: string }> = {
 const StatusIcon = ({ s, size = 15 }: { s: SiteStatus; size?: number }) =>
   s === 'good' ? <CheckCircle2 size={size} className="text-leaf" /> : s === 'warning' ? <CircleAlert size={size} className="text-amber" /> : <AlertTriangle size={size} className="text-crescent" />
 
+/** Staff tied to one office who approve nothing get their own simpler first screen. */
 export function Dashboard() {
+  const { role, scopeOffice, can } = usePerm()
+  if (role && scopeOffice && !role.canApprove && can('projects')) return <FieldDashboard />
+  return <HeadOfficeDashboard />
+}
+
+function HeadOfficeDashboard() {
   const lang = useLang()
   const user = useUser()
   const s = useStore()
@@ -228,9 +236,13 @@ export function Dashboard() {
               sub={
                 myQueue[0]
                   ? `${myQueue[0].code} — ${myQueue[0].purpose[lang]}`
-                  : ar
-                    ? 'لا توجد طلبات لدورك الحالي — بدّل الدور من الأعلى'
-                    : 'Nothing for your current role — switch role at the top'
+                  : LIVE
+                    ? ar
+                      ? 'لا توجد طلبات بانتظارك الآن'
+                      : 'Nothing is waiting for you right now'
+                    : ar
+                      ? 'لا توجد طلبات لدورك الحالي — بدّل الدور من الأعلى (للعرض)'
+                      : 'Nothing for your current role — switch role at the top (demo)'
               }
               tone={myQueue.length + myReallocs.length ? 'amber' : 'muted'}
             />

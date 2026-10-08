@@ -99,9 +99,23 @@ export function Close() {
                       <span className="hidden xl:inline">— {getUsers().find((u) => u.id === close.closedBy)?.name[lang]}</span>
                     </span>
                   ) : (
-                    <Button className="h-9" variant={ready ? 'primary' : 'quiet'} disabled={!ready || !isFM} onClick={() => s.closeMonth(office.id)}>
-                      <Lock size={15} /> {ar ? 'إقفال الشهر' : 'Close month'}
-                    </Button>
+                    <div className="inline-flex flex-col items-end gap-1">
+                      <Button
+                        className="h-9"
+                        variant={ready ? 'primary' : 'quiet'}
+                        disabled={!ready || !isFM}
+                        title={blockReason(checks.map((c, i) => (c.ok ? null : labels[i])).filter(Boolean) as string[], isFM, ar)}
+                        onClick={() => s.closeMonth(office.id)}
+                      >
+                        <Lock size={15} /> {ar ? 'إقفال الشهر' : 'Close month'}
+                      </Button>
+                      {!ready && (
+                        <span className="text-[12px] text-muted">
+                          {ar ? `متبقٍ ${checks.filter((c) => !c.ok).length} من ${checks.length} شروط` : `${checks.filter((c) => !c.ok).length} of ${checks.length} checks left`}
+                        </span>
+                      )}
+                      {ready && !isFM && <span className="text-[12px] text-muted">{ar ? 'الإقفال لمدير الشؤون المالية' : 'Only the finance manager can close'}</span>}
+                    </div>
                   )}
                 </td>
               </tr>
@@ -111,4 +125,11 @@ export function Close() {
       </Panel>
     </div>
   )
+}
+
+/** Why the button is greyed out — shown on hover and read by screen readers. */
+function blockReason(missing: string[], isFM: boolean, ar: boolean) {
+  if (missing.length) return ar ? `لم يكتمل: ${missing.join('، ')}` : `Not complete yet: ${missing.join(', ')}`
+  if (!isFM) return ar ? 'الإقفال لمدير الشؤون المالية فقط' : 'Only the finance manager can close the month'
+  return undefined
 }

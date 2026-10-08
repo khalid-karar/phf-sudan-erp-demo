@@ -26,7 +26,7 @@ import { Offices } from './pages/settings/Offices'
 import { Organization } from './pages/settings/Organization'
 import { Roles } from './pages/settings/Roles'
 import { Users } from './pages/settings/Users'
-import { Upcoming } from './pages/Upcoming'
+import { NotFound } from './pages/NotFound'
 import { HelpCentre } from './pages/Help'
 import { Leave, Payroll, Staff } from './pages/hr/Hr'
 import { Beneficiaries, PatientStats } from './pages/patients/Patients'
@@ -110,7 +110,7 @@ export default function App() {
                 {routes.map(([path, el]) => (
                   <Route key={path} path={path} element={<Guard>{el}</Guard>} />
                 ))}
-                <Route path="*" element={<Guard><Upcoming /></Guard>} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </Layout>
           }
