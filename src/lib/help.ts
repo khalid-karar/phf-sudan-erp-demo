@@ -439,6 +439,109 @@ export function articleFor(pathname: string): HelpArticle | undefined {
     .sort((a, b) => b.path.length - a.path.length)[0]
 }
 
+/** Jobs that cross several pages — the questions people actually ask ("how do I get money for a clinic day?"). */
+export interface HelpTask {
+  id: string
+  title: Bi
+  who: Bi // one line: who usually does this
+  steps: { text: Bi; to?: string }[]
+}
+
+export const tasks: HelpTask[] = [
+  {
+    id: 'money',
+    title: { ar: 'أحتاج مالاً لنشاط ميداني', en: 'I need money for a field activity' },
+    who: { ar: 'المسؤول الميداني', en: 'Field officer' },
+    steps: [
+      { text: { ar: 'تأكد أن النشاط مُنشأ قبل التنفيذ — له رقم يربط الصرف بالتقرير الفني.', en: 'Make sure the activity exists before the work starts — its number ties the spending to the field report.' }, to: '/activities' },
+      { text: { ar: 'اطلب صرف مبلغ: اختر النشاط، فيُملأ المشروع والبند. أدخل المبلغ وانظر أثره على السقف.', en: 'Request the money: pick the activity and the project and line fill in. Enter the amount and watch its effect on the ceiling.' }, to: '/requests/new' },
+      { text: { ar: 'تابع طلبك: ترى عند من هو الآن. إن رُفض افتحه لتعرف السبب.', en: 'Follow your request: you can see who has it now. If it is rejected, open it to see why.' }, to: '/requests' },
+      { text: { ar: 'بعد الاعتماد تدفع المالية (نقداً أو بنك أو عهدة). بعد النشاط أرسل التقرير الفني.', en: 'After approval Finance pays (cash, bank or advance). After the activity, send the field report.' }, to: '/activities/report' },
+    ],
+  },
+  {
+    id: 'report',
+    title: { ar: 'أريد إرسال تقرير ميداني (حتى دون إنترنت)', en: 'I want to send a field report (even offline)' },
+    who: { ar: 'المسؤول الميداني', en: 'Field officer' },
+    steps: [
+      { text: { ar: 'اختر النشاط. الأقدم المتأخر يظهر أولاً.', en: 'Pick the activity. The oldest late one appears first.' }, to: '/activities/report' },
+      { text: { ar: 'أدخل عدد الرجال والنساء والأطفال، واكتب ما تم، وأضف صوراً (تُصغَّر تلقائياً).', en: 'Enter men, women and children, write what was done, and add photos (they are shrunk automatically).' } },
+      { text: { ar: 'إذا انقطع الإنترنت يُحفظ التقرير على جهازك ويُرسل وحده عند عودة الاتصال.', en: 'If the internet drops, the report is saved on your device and sent by itself when the connection returns.' } },
+      { text: { ar: 'مكتبك ضعيف الاتصال جداً؟ استخدم قالب Excel الجاهز لرفع عدة تقارير دفعة واحدة.', en: 'Very weak connection at your office? Use the Excel template to upload several reports at once.' }, to: '/activities/import' },
+    ],
+  },
+  {
+    id: 'approve',
+    title: { ar: 'عليّ اعتماد أو رفض طلب', en: 'I have to approve or reject a request' },
+    who: { ar: 'المشرف / مدير المالية / المدير التنفيذي', en: 'Supervisor / finance manager / executive director' },
+    steps: [
+      { text: { ar: 'افتح ما ينتظرك. الرقم الأحمر في القائمة يخبرك بعدده.', en: 'Open what is waiting for you. The red number in the menu tells you how many.' }, to: '/approvals' },
+      { text: { ar: 'افتح الطلب وانظر أثره على البند والمحور والمشروع قبل القرار.', en: 'Open the request and check its effect on the line, pillar and project before deciding.' } },
+      { text: { ar: 'اعتمد، أو ارفض مع كتابة السبب — يصل السبب إلى صاحب الطلب.', en: 'Approve, or reject with a reason — the reason reaches the requester.' } },
+    ],
+  },
+  {
+    id: 'pay',
+    title: { ar: 'أريد دفع طلب معتمد', en: 'I want to pay an approved request' },
+    who: { ar: 'المحاسب', en: 'Accountant' },
+    steps: [
+      { text: { ar: 'افتح السندات: القائمة العلوية فيها الطلبات المعتمدة بانتظار الصرف. ابحث أو رتّبها.', en: 'Open vouchers: the top list holds approved requests waiting to be paid. Search or sort it.' }, to: '/finance/vouchers' },
+      { text: { ar: 'اضغط «صرف» واختر الطريقة: عهدة موظف، نقداً من صندوق المكتب، تحويل بنكي، أو بنكك.', en: 'Press “Pay” and choose how: staff advance, cash from the office box, bank transfer or Bankak.' } },
+      { text: { ar: 'راجع القيد المحاسبي الذي سيُسجَّل ثم أصدر السند.', en: 'Check the journal entry that will be posted, then issue the voucher.' } },
+    ],
+  },
+  {
+    id: 'advance',
+    title: { ar: 'أريد تسوية عهدة بعد النشاط', en: 'I want to settle an advance after an activity' },
+    who: { ar: 'المحاسب والمسؤول الميداني', en: 'Accountant and field officer' },
+    steps: [
+      { text: { ar: 'ارفع التقرير الفني للنشاط أولاً — لا تُسوّى العهدة إلا بعد وصوله.', en: 'Send the activity’s field report first — an advance can only be settled after it arrives.' }, to: '/activities/report' },
+      { text: { ar: 'افتح العُهد وابحث عن العهدة. المتأخرة بالأحمر.', en: 'Open advances and find the advance. Overdue ones are red.' }, to: '/finance/advances' },
+      { text: { ar: 'اضغط «تسوية»، أدخل الفواتير والمصروف الفعلي والمبلغ المُرجع.', en: 'Press “Settle”, then enter the receipts, actual spending and the amount returned.' } },
+    ],
+  },
+  {
+    id: 'close',
+    title: { ar: 'أريد إقفال الشهر لمكتب', en: 'I want to close the month for an office' },
+    who: { ar: 'مدير الشؤون المالية', en: 'Finance manager' },
+    steps: [
+      { text: { ar: 'سوِّ العُهد المستحقة.', en: 'Settle the advances that are due.' }, to: '/finance/advances' },
+      { text: { ar: 'عالج المصروفات التي لا تقرير فنياً لها.', en: 'Deal with expenses that have no field report.' }, to: '/reconciliation' },
+      { text: { ar: 'اجرِ جرد الصندوق وعلّم «تم»، ثم اضغط «إقفال الشهر». كل خانة حمراء تقودك إلى الصفحة التي تحلّها.', en: 'Count the cash box and tick “Done”, then press “Close month”. Each red cell takes you to the page that fixes it.' }, to: '/finance/close' },
+    ],
+  },
+  {
+    id: 'hq',
+    title: { ar: 'أريد إرسال التقرير الشهري إلى المقر', en: 'I want to send the monthly report to HQ' },
+    who: { ar: 'مدير الشؤون المالية', en: 'Finance manager' },
+    steps: [
+      { text: { ar: 'افتح التقرير واختر الشهر — الأرقام تأتي من النظام ولا تُكتب يدوياً.', en: 'Open the report and pick the month — figures come from the system and are not typed.' }, to: '/reports/hq' },
+      { text: { ar: 'اكتب الملخص والتحديات بكلماتك ثم احفظ المسودة.', en: 'Write the summary and challenges in your own words, then save the draft.' } },
+      { text: { ar: 'بعد اعتماد الدور المحدد، اضغط «إرسال بالبريد». يُسجَّل كل إرسال في سجل الإرسال.', en: 'After the chosen role approves, press “Send by email”. Every send is recorded in the sent log.' }, to: '/reports/sent' },
+    ],
+  },
+  {
+    id: 'beneficiary',
+    title: { ar: 'أريد تسجيل مستفيد دون تكرار', en: 'I want to register a beneficiary without duplicates' },
+    who: { ar: 'موظف التسجيل', en: 'Registrar' },
+    steps: [
+      { text: { ar: 'ابحث بالاسم أو الهاتف أولاً.', en: 'Search by name or phone first.' }, to: '/patients' },
+      { text: { ar: 'إن لم تجده سجّله — ينبّهك النظام إذا وجد شخصاً مشابهاً.', en: 'If not found, register them — the system warns you if someone similar exists.' } },
+      { text: { ar: 'سجّل الخدمة مربوطة بالنشاط والمشروع الذي موّلها.', en: 'Record the service, linked to the activity and project that funded it.' } },
+    ],
+  },
+  {
+    id: 'user',
+    title: { ar: 'أريد إضافة موظف جديد إلى النظام', en: 'I want to add a new staff member to the system' },
+    who: { ar: 'مدير النظام', en: 'System administrator' },
+    steps: [
+      { text: { ar: 'تأكد أن الدور المناسب موجود (ما يراه وما يستطيع فعله).', en: 'Check the right role exists (what they see and can do).' }, to: '/settings/roles' },
+      { text: { ar: 'أنشئ المستخدم: الاسم والبريد والمكتب والدور.', en: 'Create the user: name, email, office and role.' }, to: '/settings/users' },
+      { text: { ar: 'إن كان سيعتمد طلبات، أضف دوره إلى قواعد الاعتماد.', en: 'If they will approve requests, add their role to the approval rules.' }, to: '/settings/approval-rules' },
+    ],
+  },
+]
+
 export const faqs: { q: Bi; a: Bi }[] = [
   {
     q: { ar: 'لماذا لا أرى وحدة المالية (أو غيرها) في القائمة؟', en: 'Why can’t I see Finance (or another module) in the menu?' },

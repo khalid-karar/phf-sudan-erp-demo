@@ -1,9 +1,9 @@
-import { BookOpen, ChevronDown, Keyboard, LifeBuoy, ListChecks, Mail, PlayCircle, Search } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, Keyboard, LifeBuoy, ListChecks, Mail, PlayCircle, Route, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { HelpDrawer } from '../components/Help'
 import { useVisibleNav } from '../components/Layout'
-import { articles, faqs, glossary, type HelpArticle } from '../lib/help'
+import { articles, faqs, glossary, tasks, type HelpArticle } from '../lib/help'
 import { useLang } from '../lib/i18n'
 import { locate } from '../lib/nav'
 import { useStore } from '../lib/store'
@@ -21,6 +21,7 @@ export function HelpCentre() {
   const [params, setParams] = useSearchParams()
   const [q, setQ] = useState('')
   const [faqOpen, setFaqOpen] = useState<number | null>(0)
+  const [taskOpen, setTaskOpen] = useState<string | null>(null)
 
   const allowed = useMemo(() => new Set(nav.flatMap((m) => m.items.map((i) => i.to))), [nav])
   const mine = articles.filter((a) => allowed.has(a.path))
@@ -34,6 +35,13 @@ export function HelpCentre() {
     .map((m) => ({ m, list: found.filter((a) => locate(a.path)?.module.key === m.key) }))
     .filter((g) => g.list.length)
   const admin = users.find((u) => u.role === 'admin')
+  // A task is shown when the person can open its first page (so it is a job they can really do).
+  const myTasks = tasks.filter((k) => {
+    const first = k.steps.find((x) => x.to)?.to
+    return !first || allowed.has(first)
+  })
+  const foundTasks = nq ? myTasks.filter((k) => norm(k.title[lang] + ' ' + k.steps.map((x) => x.text[lang]).join(' ')).includes(nq)) : myTasks
+  const Go = ar ? ArrowLeft : ArrowRight
 
   return (
     <div>
@@ -92,6 +100,50 @@ export function HelpCentre() {
           </span>
         </a>
       </div>
+
+      {foundTasks.length > 0 && (
+        <section className="mb-9">
+          <h2 className="mb-3 flex items-center gap-2 font-kufi text-[18px] font-semibold">
+            <Route size={19} /> {ar ? 'ما الذي تريد إنجازه؟' : 'What do you want to get done?'}
+          </h2>
+          <div className="grid gap-3 md:grid-cols-2">
+            {foundTasks.map((k) => {
+              const isOpen = taskOpen === k.id || (!!nq && foundTasks.length <= 2)
+              return (
+                <div key={k.id} className="rounded-lg border border-line bg-surface">
+                  <button onClick={() => setTaskOpen(isOpen && taskOpen === k.id ? null : k.id)} className="flex w-full items-center gap-3 px-4 py-3 text-start" aria-expanded={isOpen}>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium">{k.title[lang]}</span>
+                      <span className="block text-[12.5px] text-muted">{k.who[lang]}</span>
+                    </span>
+                    <ChevronDown size={17} className={`shrink-0 text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {isOpen && (
+                    <ol className="space-y-3 border-t border-line px-4 py-4">
+                      {k.steps.map((st, i) => {
+                        const ok = !st.to || allowed.has(st.to)
+                        return (
+                          <li key={i} className="flex gap-3">
+                            <span className="num mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-nile-soft text-[12.5px] font-semibold text-nile">{i + 1}</span>
+                            <span className="min-w-0 flex-1 text-[14.5px] leading-relaxed">
+                              {st.text[lang]}
+                              {st.to && ok && (
+                                <Link to={st.to} className="ms-2 inline-flex items-center gap-1 whitespace-nowrap text-[13.5px] font-medium text-nile hover:underline">
+                                  {ar ? 'افتح الصفحة' : 'Open page'} <Go size={14} />
+                                </Link>
+                              )}
+                            </span>
+                          </li>
+                        )
+                      })}
+                    </ol>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       <h2 className="mb-3 flex items-center gap-2 font-kufi text-[18px] font-semibold">
         <BookOpen size={19} /> {nq ? (ar ? `نتائج البحث (${found.length})` : `Search results (${found.length})`) : ar ? 'شرح الصفحات' : 'Page guides'}

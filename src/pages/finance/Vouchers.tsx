@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PayModal } from '../../components/PayModal'
@@ -21,10 +21,19 @@ export function Vouchers() {
   const [paying, setPaying] = useState<SpendRequest | null>(null)
   const [entry, setEntry] = useState<JournalEntry | null>(null)
   const [receipt, setReceipt] = useState(false)
+  const [q, setQ] = useState('')
+  const [sort, setSort] = useState<'old' | 'new' | 'big'>('old')
+  const [showAll, setShowAll] = useState(false)
   const { can, viewOffice } = usePerm()
   void user
   const isFM = can('finance', 'edit')
-  const awaiting = s.requests.filter((r) => r.status === 'approved' && (!viewOffice || r.officeId === viewOffice)).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+  const base = s.requests.filter((r) => r.status === 'approved' && (!viewOffice || r.officeId === viewOffice))
+  const needle = q.trim().toLowerCase()
+  const awaiting = base
+    .filter((r) => !needle || [r.code, r.purpose.ar, r.purpose.en, r.activityCode ?? '', getOffices().find((o) => o.id === r.officeId)?.name[lang] ?? ''].some((x) => x.toLowerCase().includes(needle)))
+    .sort((a, b) => (sort === 'big' ? b.amountUSD - a.amountUSD : sort === 'new' ? +new Date(b.createdAt) - +new Date(a.createdAt) : +new Date(a.createdAt) - +new Date(b.createdAt)))
+  const LIMIT = 8
+  const shown = showAll ? awaiting : awaiting.slice(0, LIMIT)
   const list = s.vouchers.filter((v) => v.kind === tab && (!viewOffice || v.officeId === viewOffice)).sort((a, b) => +new Date(b.date) - +new Date(a.date))
 
   return (
@@ -41,12 +50,25 @@ export function Vouchers() {
         }
       />
 
-      <Panel className="mb-6" title={ar ? `طلبات معتمدة بانتظار الصرف (${awaiting.length})` : `Approved requests awaiting payment (${awaiting.length})`}>
+      <Panel className="mb-6" title={ar ? `طلبات معتمدة بانتظار الصرف (${base.length})` : `Approved requests awaiting payment (${base.length})`}>
         {!isFM && <p className="border-b border-line bg-amber-soft px-5 py-2 text-[13px] text-amber">{ar ? 'دورك يتيح العرض فقط. الصرف لمن لديه صلاحية إدخال في المالية.' : 'Your role is view-only here. Payments need enter access to Finance.'}</p>}
-        <div className="max-h-[340px] overflow-auto">
+        {base.length > 4 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-2.5">
+            <label className="flex h-9 min-w-[200px] flex-1 items-center gap-2 rounded-md border border-line bg-surface px-2.5 text-[13.5px]">
+              <Search size={15} className="text-muted" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={ar ? 'ابحث بالرقم أو الغرض أو المكتب' : 'Search by number, purpose or office'} className="w-full bg-transparent outline-none" />
+            </label>
+            <select aria-label={ar ? 'الترتيب' : 'Sort'} value={sort} onChange={(e) => setSort(e.target.value as 'old' | 'new' | 'big')} className="h-9 rounded-md border border-line bg-surface px-2 text-[13.5px]">
+              <option value="old">{ar ? 'الأقدم أولاً' : 'Oldest first'}</option>
+              <option value="new">{ar ? 'الأحدث أولاً' : 'Newest first'}</option>
+              <option value="big">{ar ? 'الأكبر مبلغاً' : 'Largest amount'}</option>
+            </select>
+          </div>
+        )}
+        <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-[14px]">
             <tbody className="divide-y divide-line">
-              {awaiting.map((r) => {
+              {shown.map((r) => {
                 const f = findLine(s.projects, r.lineId)!
                 return (
                   <tr key={r.id}>
@@ -79,6 +101,12 @@ export function Vouchers() {
             </tbody>
           </table>
         </div>
+        {awaiting.length === 0 && needle && <p className="px-5 py-4 text-[13.5px] text-muted">{ar ? 'لا نتائج مطابقة.' : 'Nothing matches your search.'}</p>}
+        {awaiting.length > LIMIT && (
+          <button type="button" onClick={() => setShowAll(!showAll)} className="w-full border-t border-line px-5 py-2.5 text-[13.5px] text-nile hover:bg-paper">
+            {showAll ? (ar ? 'عرض أقل' : 'Show fewer') : ar ? `عرض الكل (${awaiting.length - LIMIT} أخرى)` : `Show all (${awaiting.length - LIMIT} more)`}
+          </button>
+        )}
       </Panel>
 
       <Tabs
