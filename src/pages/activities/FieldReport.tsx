@@ -71,13 +71,13 @@ export function FieldReport() {
   const lang = useLang()
   const ar = lang === 'ar'
   const s = useStore()
-  const { scopeOffice } = usePerm()
+  const { viewOffice } = usePerm()
   const nav = useNavigate()
   const [params] = useSearchParams()
   const realOnline = useOnline()
   const online = realOnline && !s.offlineSim
 
-  const open = s.activities.filter((a) => !a.report && (!scopeOffice || a.officeId === scopeOffice) && !s.outbox.some((o) => o.activityId === a.id))
+  const open = s.activities.filter((a) => !a.report && (!viewOffice || a.officeId === viewOffice) && !s.outbox.some((o) => o.activityId === a.id))
   const [actId, setActId] = useState(params.get('activity') ?? open.find((a) => +new Date(a.date) <= Date.now())?.id ?? open[0]?.id ?? '')
   const act = s.activities.find((a) => a.id === actId)
   const [doneOn, setDoneOn] = useState(new Date().toISOString().slice(0, 10))

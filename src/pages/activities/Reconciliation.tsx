@@ -38,9 +38,9 @@ export function Reconciliation() {
   const lang = useLang()
   const ar = lang === 'ar'
   const s = useStore()
-  const { can, scopeOffice } = usePerm()
+  const { can, viewOffice } = usePerm()
   const [linking, setLinking] = useState<Gap | null>(null)
-  const gaps = useMemo(() => matchingGaps(s).filter((g) => !scopeOffice || g.officeId === scopeOffice), [s, scopeOffice])
+  const gaps = useMemo(() => matchingGaps(s).filter((g) => !viewOffice || g.officeId === viewOffice), [s, viewOffice])
   const canAct = can('activities', 'edit') || can('finance', 'edit')
 
   // Suggested matches: an expense with no report and a reported activity with no spending, same office and line, within 14 days.

@@ -10,7 +10,7 @@ import { findLine, lineUsage } from '../../lib/budget'
 import { date, num, relDays, usd } from '../../lib/format'
 import { useLang } from '../../lib/i18n'
 import { lastMonth, periodLabel, recentPeriods } from '../../lib/reportData'
-import { usePerm, useStore } from '../../lib/store'
+import { usePerm, useStore, useOfficeFilter } from '../../lib/store'
 
 const leaveName = {
   annual: { ar: 'سنوية', en: 'Annual' },
@@ -30,7 +30,7 @@ export function Staff() {
   const s = useStore()
   const { can, scopeOffice } = usePerm()
   const [q, setQ] = useState('')
-  const [office, setOffice] = useState(scopeOffice ?? '')
+  const [office, setOffice] = useOfficeFilter()
   const [dept, setDept] = useState<Department | ''>('')
   const [edit, setEdit] = useState<Employee | null>(null)
   const list = s.employees.filter(
@@ -347,10 +347,10 @@ export function Leave() {
   const lang = useLang()
   const ar = lang === 'ar'
   const s = useStore()
-  const { can, user, scopeOffice } = usePerm()
+  const { can, user, viewOffice } = usePerm()
   const [open, setOpen] = useState(false)
   const me = s.employees.find((e) => e.userId === user.id)
-  const list = s.leaves.filter((l) => !scopeOffice || s.employees.find((e) => e.id === l.employeeId)?.officeId === scopeOffice).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+  const list = s.leaves.filter((l) => !viewOffice || s.employees.find((e) => e.id === l.employeeId)?.officeId === viewOffice).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
   const away = s.leaves.filter((l) => l.status === 'approved' && +new Date(l.from) <= Date.now() + 7 * 86_400_000 && +new Date(l.to) >= Date.now())
   return (
     <div>

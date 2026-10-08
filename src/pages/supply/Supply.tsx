@@ -20,22 +20,22 @@ export function Stock() {
   const lang = useLang()
   const ar = lang === 'ar'
   const s = useStore()
-  const { can, scopeOffice } = usePerm()
+  const { can, viewOffice } = usePerm()
   const nav = useNavigate()
   const [q, setQ] = useState('')
   const [onlyLow, setOnlyLow] = useState(false)
-  const stores = s.offices.filter((o) => s.stock.some((x) => x.officeId === o.id && x.qty !== 0) || o.isHQ).filter((o) => !scopeOffice || o.id === scopeOffice)
+  const stores = s.offices.filter((o) => s.stock.some((x) => x.officeId === o.id && x.qty !== 0) || o.isHQ).filter((o) => !viewOffice || o.id === viewOffice)
   const qty = (i: string, o: string) => s.stock.find((x) => x.itemId === i && x.officeId === o)?.qty
   const low = (it: Item, o: string) => {
     const v = qty(it.id, o)
     return v !== undefined && v < it.min
   }
   const rows = s.items.filter((it) => it.active !== false && (!q || it.name.ar.includes(q) || it.name.en.toLowerCase().includes(q.toLowerCase()) || it.code.toLowerCase().includes(q.toLowerCase())) && (!onlyLow || stores.some((o) => low(it, o.id))))
-  const value = s.stock.filter((x) => !scopeOffice || x.officeId === scopeOffice).reduce((t, x) => t + x.qty * (s.items.find((i) => i.id === x.itemId)?.unitValueUSD ?? 0), 0)
-  const transit = s.shipments.filter((x) => x.status === 'in_transit' && (!scopeOffice || x.toOfficeId === scopeOffice))
+  const value = s.stock.filter((x) => !viewOffice || x.officeId === viewOffice).reduce((t, x) => t + x.qty * (s.items.find((i) => i.id === x.itemId)?.unitValueUSD ?? 0), 0)
+  const transit = s.shipments.filter((x) => x.status === 'in_transit' && (!viewOffice || x.toOfficeId === viewOffice))
   const transitValue = transit.flatMap((x) => x.lines).reduce((t, l) => t + l.qty * (s.items.find((i) => i.id === l.itemId)?.unitValueUSD ?? 0), 0)
   const lowCount = s.items.reduce((t, it) => t + stores.filter((o) => low(it, o.id)).length, 0)
-  const recent = s.stockMoves.filter((m) => !scopeOffice || m.officeId === scopeOffice).sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 12)
+  const recent = s.stockMoves.filter((m) => !viewOffice || m.officeId === viewOffice).sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 12)
 
   return (
     <div>

@@ -18,7 +18,7 @@ export function Shipments() {
   const lang = useLang()
   const ar = lang === 'ar'
   const s = useStore()
-  const { can, scopeOffice } = usePerm()
+  const { can, viewOffice } = usePerm()
   const [params, setParams] = useSearchParams()
   const [creating, setCreating] = useState(false)
   const [receiving, setReceiving] = useState<Shipment | null>(null)
@@ -28,7 +28,7 @@ export function Shipments() {
       setParams({}, { replace: true })
     }
   }, [params, setParams])
-  const mine = s.shipments.filter((x) => !scopeOffice || x.toOfficeId === scopeOffice || x.fromOfficeId === scopeOffice)
+  const mine = s.shipments.filter((x) => !viewOffice || x.toOfficeId === viewOffice || x.fromOfficeId === viewOffice)
   const office = (id: string) => s.offices.find((o) => o.id === id)
   const value = (sh: Shipment) => sh.lines.reduce((t, l) => t + l.qty * (s.items.find((i) => i.id === l.itemId)?.unitValueUSD ?? 0), 0)
   const Arrow = ar ? ArrowLeft : ArrowRight
@@ -59,7 +59,7 @@ export function Shipments() {
                 {list.slice(0, st === 'delivered' ? 6 : 20).map((sh) => {
                   const v = s.vehicles.find((x) => x.id === sh.vehicleId)
                   const short = sh.lines.some((l) => l.received !== undefined && l.received < l.qty)
-                  const canReceive = can('supply', 'edit') || can('logistics', 'edit') || scopeOffice === sh.toOfficeId
+                  const canReceive = can('supply', 'edit') || can('logistics', 'edit') || viewOffice === sh.toOfficeId
                   return (
                     <article key={sh.id} className="rounded-md border border-line bg-surface p-3.5">
                       <div className="flex items-center justify-between gap-2">
@@ -254,9 +254,9 @@ export function Fleet() {
   const lang = useLang()
   const ar = lang === 'ar'
   const s = useStore()
-  const { can, scopeOffice } = usePerm()
+  const { can, viewOffice } = usePerm()
   const [fuel, setFuel] = useState<Vehicle | null>(null)
-  const list = s.vehicles.filter((v) => !scopeOffice || v.officeId === scopeOffice)
+  const list = s.vehicles.filter((v) => !viewOffice || v.officeId === viewOffice)
   const rate = (s.rates.at(-1)?.rate ?? 1)
   return (
     <div>

@@ -18,8 +18,8 @@ export function RequestsList() {
   const s = useStore()
   const nav = useNavigate()
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all')
-  const { scopeOffice, can } = usePerm()
-  const scoped = s.requests.filter((r) => !scopeOffice || r.officeId === scopeOffice)
+  const { viewOffice, can } = usePerm()
+  const scoped = s.requests.filter((r) => !viewOffice || r.officeId === viewOffice)
   const rows = scoped.filter((r) => filter === 'all' || r.status === filter).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
   const counts = (st: RequestStatus) => scoped.filter((r) => r.status === st).length
 

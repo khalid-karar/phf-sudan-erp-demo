@@ -6,7 +6,7 @@ import { lineUsage, pillarUsage, projectUsage } from '../../lib/budget'
 import { num, usd } from '../../lib/format'
 import { balances } from '../../lib/ledger'
 import { useLang } from '../../lib/i18n'
-import { getOffices, useStore } from '../../lib/store'
+import { getOffices, useStore, useOfficeFilter } from '../../lib/store'
 import { Tabs } from './common'
 
 export function FinanceReports() {
@@ -41,7 +41,7 @@ function TrialBalance() {
   const lang = useLang()
   const ar = lang === 'ar'
   const s = useStore()
-  const [office, setOffice] = useState('')
+  const [office, setOffice] = useOfficeFilter()
   const [project, setProject] = useState('')
   const bal = useMemo(() => balances(s.accounts, s.journal, { officeId: office || undefined, projectId: project || undefined }), [s.accounts, s.journal, office, project])
   const rows = s.accounts

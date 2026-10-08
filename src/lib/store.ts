@@ -95,6 +95,8 @@ interface State {
   tourSeen: boolean
   visited: Record<string, string[]>
   checklistHidden: string[]
+  viewOffice: string // '' = all offices; the office an all-office user has chosen to look at
+  setViewOffice: (id: string) => void
   startTour: () => void
   endTour: () => void
   markVisited: (path: string) => void
@@ -400,6 +402,8 @@ export const useStore = create<State>()(
   tourSeen: false,
   visited: {},
   checklistHidden: [],
+  viewOffice: '',
+  setViewOffice: (id) => set({ viewOffice: id }),
   startTour: () => set({ tourOpen: true }),
   endTour: () => set({ tourOpen: false, tourSeen: true }),
   markVisited: (path) => {
@@ -579,7 +583,7 @@ export const useStore = create<State>()(
     } catch {
       /* storage blocked */
     }
-    set({ ...fresh(), userId: 'u-fo', visited: {}, checklistHidden: [], tourSeen: false })
+    set({ ...fresh(), userId: 'u-fo', visited: {}, checklistHidden: [], tourSeen: false, viewOffice: '' })
     get().toast({ ar: 'أُعيدت بيانات العرض إلى وضعها الأصلي', en: 'Demo data restored to its starting point' })
   },
   toast: (text, tone = 'ok') => {
@@ -1178,7 +1182,7 @@ export const useStore = create<State>()(
       void _t
       void _o
       // Live mode keeps only screen preferences here; the data always comes from the server.
-      if (LIVE) return { outbox: s.outbox, lang: s.lang, sidebarCollapsed: s.sidebarCollapsed, tourSeen: s.tourSeen, visited: s.visited, checklistHidden: s.checklistHidden } as typeof rest
+      if (LIVE) return { outbox: s.outbox, lang: s.lang, sidebarCollapsed: s.sidebarCollapsed, tourSeen: s.tourSeen, visited: s.visited, checklistHidden: s.checklistHidden, viewOffice: s.viewOffice } as typeof rest
       return rest
     },
   },
@@ -1213,7 +1217,19 @@ export function usePerm() {
   const role = useStore((s) => s.roles.find((r) => r.id === user.role))
   const can = (m: ModuleKey, min: Access = 'view') => !!role && rank[role.permissions[m]] >= rank[min]
   const scopeOffice = role?.scope === 'office' ? user.officeId : null
-  return { can, role, user, scopeOffice }
+  const chosen = useStore((s) => s.viewOffice)
+  const known = useStore((s) => s.offices.some((o) => o.id === chosen))
+  // What the screen should show: a one-office role always sees its own office; an all-office role
+  // sees whichever office it picked in the top bar (null = every office).
+  const viewOffice = scopeOffice ?? (chosen && known ? chosen : null)
+  return { can, role, user, scopeOffice, viewOffice }
+}
+
+/** The office picker used by page-level dropdowns: it reads and writes the same top-bar choice. */
+export function useOfficeFilter(): [string, (id: string) => void] {
+  const { viewOffice } = usePerm()
+  const set = useStore((s) => s.setViewOffice)
+  return [viewOffice ?? '', set]
 }
 
 export const useUser = () => {

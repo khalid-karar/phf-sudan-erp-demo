@@ -30,6 +30,7 @@ import { Tour } from './Help'
 import { badgeMeaning, helpItem, locate, modules, type NavItem, type NavModule } from '../lib/nav'
 import { useStore, usePerm, useUser } from '../lib/store'
 import { CommandPalette } from './CommandPalette'
+import { OfficePicker } from './OfficePicker'
 import { NotificationBell } from './NotificationBell'
 import { Toasts } from './ui'
 
@@ -65,7 +66,7 @@ export function useVisibleNav() {
 
 export function useBadges() {
   const user = useUser()
-  const { scopeOffice } = usePerm()
+  const { viewOffice: scopeOffice } = usePerm()
   const s = useStore()
   const mine = (steps: { role: string; status: string }[]) => steps.some((st) => st.status === 'pending' && st.role === user.role)
   const inScope = (o: string) => !scopeOffice || o === scopeOffice
@@ -444,6 +445,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </button>
             <Breadcrumb />
             <div className="flex-1" />
+            <OfficePicker />
             <button
               data-tour="search"
               onClick={() => setPalette(true)}

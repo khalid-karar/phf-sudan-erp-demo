@@ -21,11 +21,11 @@ export function Vouchers() {
   const [paying, setPaying] = useState<SpendRequest | null>(null)
   const [entry, setEntry] = useState<JournalEntry | null>(null)
   const [receipt, setReceipt] = useState(false)
-  const { can } = usePerm()
+  const { can, viewOffice } = usePerm()
   void user
   const isFM = can('finance', 'edit')
-  const awaiting = s.requests.filter((r) => r.status === 'approved').sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-  const list = s.vouchers.filter((v) => v.kind === tab).sort((a, b) => +new Date(b.date) - +new Date(a.date))
+  const awaiting = s.requests.filter((r) => r.status === 'approved' && (!viewOffice || r.officeId === viewOffice)).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+  const list = s.vouchers.filter((v) => v.kind === tab && (!viewOffice || v.officeId === viewOffice)).sort((a, b) => +new Date(b.date) - +new Date(a.date))
 
   return (
     <div>

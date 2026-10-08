@@ -9,7 +9,7 @@ import { serviceName } from '../../data/people'
 import type { Beneficiary, ServiceType } from '../../data/types'
 import { date, num } from '../../lib/format'
 import { useLang } from '../../lib/i18n'
-import { usePerm, useStore } from '../../lib/store'
+import { usePerm, useStore, useOfficeFilter } from '../../lib/store'
 
 const THIS_YEAR = new Date().getFullYear()
 const ageOf = (b: Beneficiary) => THIS_YEAR - b.birthYear
@@ -45,7 +45,7 @@ export function Beneficiaries() {
   const s = useStore()
   const { can, scopeOffice, user } = usePerm()
   const [q, setQ] = useState('')
-  const [office, setOffice] = useState(scopeOffice ?? '')
+  const [office, setOffice] = useOfficeFilter()
   const [gender, setGender] = useState<'' | 'm' | 'f'>('')
   const [svc, setSvc] = useState<ServiceType | ''>('')
   const [open, setOpen] = useState<Beneficiary | null>(null)
@@ -498,7 +498,7 @@ export function PatientStats() {
   const ar = lang === 'ar'
   const s = useStore()
   const { scopeOffice } = usePerm()
-  const [office, setOffice] = useState(scopeOffice ?? '')
+  const [office, setOffice] = useOfficeFilter()
   const st = usePatientStats(office || scopeOffice || '', LIVE)
   const list = LIVE ? [] : s.beneficiaries.filter((b) => !office || b.officeId === office)
   const services = list.flatMap((b) => b.services)

@@ -41,7 +41,7 @@ export function Calendar() {
   const lang = useLang()
   const ar = lang === 'ar'
   const s = useStore()
-  const { can, scopeOffice } = usePerm()
+  const { can, viewOffice } = usePerm()
   const canEdit = can('alerts', 'edit') || can('reports', 'edit')
   const [cursor, setCursor] = useState(() => {
     const n = new Date()
@@ -58,17 +58,17 @@ export function Calendar() {
       for (const at of occurrences(d, monthStart, monthEnd))
         out.push({ id: `${d.id}-${+at}`, at, title: d.title[lang], kind: 'deadline', link: '/alerts/calendar', deadline: d, late: !d.done && +at < Date.now() })
     for (const a of s.activities) {
-      if (scopeOffice && a.officeId !== scopeOffice) continue
+      if (viewOffice && a.officeId !== viewOffice) continue
       const at = new Date(a.date)
       if (at >= monthStart && at <= monthEnd) out.push({ id: a.id, at, title: `${a.code} ${a.title[lang]}`, kind: 'activity', link: `/activities/${a.id}` })
     }
     for (const x of s.advances) {
-      if (x.status !== 'open' || (scopeOffice && x.officeId !== scopeOffice)) continue
+      if (x.status !== 'open' || (viewOffice && x.officeId !== viewOffice)) continue
       const at = new Date(x.dueAt)
       if (at >= monthStart && at <= monthEnd) out.push({ id: x.id, at, title: ar ? `تسوية ${x.no}` : `Settle ${x.no}`, kind: 'advance', link: '/finance/advances', late: +at < Date.now() })
     }
     return out.filter((i) => show[i.kind])
-  }, [s.deadlines, s.activities, s.advances, monthStart, monthEnd, lang, ar, scopeOffice, show])
+  }, [s.deadlines, s.activities, s.advances, monthStart, monthEnd, lang, ar, viewOffice, show])
 
   // Grid starts on the organisation's chosen week start.
   const ws = { sat: 6, sun: 0, mon: 1 }[s.org.weekStartsOn]

@@ -6,7 +6,7 @@ import { staff } from '../../data/finance'
 import { date, daysUntil, num, relDays, usd } from '../../lib/format'
 import { balances, revaluation } from '../../lib/ledger'
 import { useLang } from '../../lib/i18n'
-import { getOffices, useStore } from '../../lib/store'
+import { getOffices, usePerm, useStore } from '../../lib/store'
 import { activityFor } from './Advances'
 import { useCloseChecks } from './Close'
 
@@ -15,14 +15,15 @@ export function FinanceOverview() {
   const ar = lang === 'ar'
   const s = useStore()
   const rate = s.rates[s.rates.length - 1].rate
-  const bal = balances(s.accounts, s.journal)
+  const { viewOffice } = usePerm()
+  const bal = balances(s.accounts, s.journal, { officeId: viewOffice || undefined })
   const cashBoxes = s.accounts.filter((a) => a.postable && a.code.startsWith('1101-')).reduce((t, a) => t + bal.get(a.code)!.sdg / rate, 0)
   const banks = s.accounts.filter((a) => a.postable && a.code.startsWith('1102')).reduce((t, a) => t + (a.currency === 'SDG' ? bal.get(a.code)!.sdg / rate : bal.get(a.code)!.balance), 0)
-  const openAdv = s.advances.filter((a) => a.status === 'open')
+  const openAdv = s.advances.filter((a) => a.status === 'open' && (!viewOffice || a.officeId === viewOffice))
   const overdue = openAdv.filter((a) => daysUntil(a.dueAt) < 0)
-  const awaiting = s.requests.filter((r) => r.status === 'approved')
-  const fx = revaluation(s.accounts, s.journal, rate).reduce((t, r) => t + r.diff, 0)
-  const closeRows = useCloseChecks()
+  const awaiting = s.requests.filter((r) => r.status === 'approved' && (!viewOffice || r.officeId === viewOffice))
+  const fx = revaluation(s.accounts, viewOffice ? s.journal.map((e) => ({ ...e, lines: e.lines.filter((l) => l.officeId === viewOffice) })) : s.journal, rate).reduce((t, r) => t + r.diff, 0)
+  const closeRows = useCloseChecks().filter((r) => !viewOffice || r.office.id === viewOffice)
   const closed = closeRows.filter((r) => r.close.closedAt).length
 
   const links: [string, ReactNode, string, string][] = [

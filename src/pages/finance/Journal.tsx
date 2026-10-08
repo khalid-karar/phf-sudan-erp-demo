@@ -4,20 +4,21 @@ import type { JournalEntry, JournalSource } from '../../data/types'
 import { date, usd } from '../../lib/format'
 import { entryTotals } from '../../lib/ledger'
 import { useLang } from '../../lib/i18n'
-import { useStore } from '../../lib/store'
+import { usePerm, useStore } from '../../lib/store'
 import { JournalEntryModal, sourceName, useAccountName } from './common'
 
 export function Journal() {
   const lang = useLang()
   const ar = lang === 'ar'
   const s = useStore()
+  const { viewOffice } = usePerm()
   const accName = useAccountName()
   const [source, setSource] = useState<JournalSource | ''>('')
   const [entry, setEntry] = useState<JournalEntry | null>(null)
   const [limit, setLimit] = useState(40)
   const list = useMemo(
-    () => [...s.journal].filter((e) => !source || e.source === source).sort((a, b) => +new Date(b.date) - +new Date(a.date) || b.no.localeCompare(a.no)),
-    [s.journal, source],
+    () => [...s.journal].filter((e) => (!source || e.source === source) && (!viewOffice || e.lines.some((l) => l.officeId === viewOffice))).sort((a, b) => +new Date(b.date) - +new Date(a.date) || b.no.localeCompare(a.no)),
+    [s.journal, source, viewOffice],
   )
   return (
     <div>

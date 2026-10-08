@@ -33,11 +33,15 @@ function HeadOfficeDashboard() {
   const lang = useLang()
   const user = useUser()
   const s = useStore()
-  const { can, scopeOffice } = usePerm()
+  const { can, scopeOffice, viewOffice } = usePerm()
+  const setView = useStore((st) => st.setViewOffice)
   const canFin = can('finance')
   const canProj = can('projects')
   const nav = useVisibleNav()
-  const [selected, setSelected] = useState<string | null>(scopeOffice ?? 'ksl')
+  const [picked, setPicked] = useState<string | null>(scopeOffice ?? 'ksl')
+  // When an office is chosen in the top bar the map follows it; clicking another office on the map changes that choice.
+  const selected = viewOffice ?? picked
+  const setSelected = (id: string | null) => (viewOffice && id ? setView(id) : setPicked(id))
   const ar = lang === 'ar'
 
   // --- per-office reconciliation status (field report vs money spent) ---
@@ -63,7 +67,7 @@ function HeadOfficeDashboard() {
 
   // --- attention items ---
   const myQueue = [
-    ...s.requests.filter((r) => r.status === 'pending' && r.steps.some((st) => st.status === 'pending' && st.role === user.role)),
+    ...s.requests.filter((r) => r.status === 'pending' && r.steps.some((st) => st.status === 'pending' && st.role === user.role) && (!viewOffice || r.officeId === viewOffice)),
   ]
   const myReallocs = s.reallocations.filter((r) => r.status === 'pending' && r.steps.some((st) => st.status === 'pending' && st.role === user.role))
   const nearCeiling = s.projects.flatMap((p) =>
@@ -73,16 +77,18 @@ function HeadOfficeDashboard() {
         .filter(({ u }) => u.ceiling > 0 && pct(u.ceiling - u.available, u.ceiling) >= 0.85),
     ),
   )
-  const inScope = Object.entries(siteData).filter(([id]) => !scopeOffice || id === scopeOffice).map(([, v]) => v)
+  const inScope = Object.entries(siteData).filter(([id]) => !viewOffice || id === viewOffice).map(([, v]) => v)
   const unmatchedTotal = inScope.reduce((a, v) => a + v.unmatched, 0)
   const unmatchedUSD = inScope.reduce((a, v) => a + v.unmatchedUSD, 0)
   const worstOffices = Object.entries(siteData)
-    .filter(([id, v]) => v.unmatched > 0 && (!scopeOffice || id === scopeOffice))
+    .filter(([id, v]) => v.unmatched > 0 && (!viewOffice || id === viewOffice))
     .sort((a, b) => b[1].unmatchedUSD - a[1].unmatchedUSD)
     .slice(0, 2)
     .map(([id]) => getOffices().find((o) => o.id === id)!.name[lang])
+  const otherOffices = viewOffice ? getOffices().filter((o) => o.id !== viewOffice) : []
   const alerting = s.deadlines
     .filter((d) => daysUntil(d.due) <= d.notifyDaysBefore)
+    .filter((d) => !otherOffices.some((o) => d.title.en.includes(o.name.en) || d.title.ar.includes(o.name.ar)))
     .sort((a, b) => +new Date(a.due) - +new Date(b.due))
 
   // --- funds ---
@@ -103,7 +109,18 @@ function HeadOfficeDashboard() {
   return (
     <div className="space-y-6">
       <header>
-        <div className="text-[13.5px] text-muted">{date(new Date().toISOString(), lang)}</div>
+        <div className="text-[13.5px] text-muted">
+          {date(new Date().toISOString(), lang)}
+          {viewOffice && sel && (
+            <>
+              {' · '}
+              <span className="font-medium text-nile">{ar ? `تعرض مكتب ${sel.name.ar} فقط` : `Showing ${sel.name.en} office only`}</span>{' '}
+              <button type="button" onClick={() => setView('')} className="text-nile underline">
+                {ar ? 'عرض كل المكاتب' : 'Show all offices'}
+              </button>
+            </>
+          )}
+        </div>
         <h1 className="mt-1 flex items-center gap-2.5 text-[28px] font-bold">
           <span>
             {greet}{ar ? '، ' : ', '}{/^(د\.|م\.|Dr\.|Eng\.)$/.test(user.name[lang].split(' ')[0]) ? user.name[lang].split(' ').slice(0, 2).join(' ') : user.name[lang].split(' ')[0]}
@@ -156,7 +173,17 @@ function HeadOfficeDashboard() {
         </div>
       )}
 
-      {canFin && (<>{/* The two funding streams */}
+      {canFin && viewOffice && selData && (
+        <Panel title={ar ? `ماليات مكتب ${sel?.name.ar ?? ''}` : `Finances — ${sel?.name.en ?? ''} office`} aside={<span className="text-[12.5px] text-muted">{ar ? 'أرصدة الصناديق الكلية تظهر عند اختيار «كل المكاتب»' : 'Fund balances for the whole organisation show under “All offices”'}</span>}>
+          <dl className="grid divide-y divide-line sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x lg:rtl:divide-x-reverse">
+            <OfficeFigure label={ar ? 'مصروف فعلي' : 'Spent'} value={usd(selData.spentUSD)} />
+            <OfficeFigure label={ar ? 'معتمد بانتظار الدفع' : 'Approved, awaiting payment'} value={usd(s.requests.filter((r) => r.officeId === viewOffice && r.status === 'approved').reduce((t, r) => t + r.amountUSD, 0))} to="/finance/vouchers" />
+            <OfficeFigure label={ar ? 'قيد الاعتماد' : 'In approval'} value={usd(s.requests.filter((r) => r.officeId === viewOffice && r.status === 'pending').reduce((t, r) => t + r.amountUSD, 0))} note={ar ? `${selData.pending} طلبات` : `${selData.pending} requests`} to="/requests" />
+            <OfficeFigure label={ar ? 'عُهد مفتوحة' : 'Open advances'} value={usd(s.advances.filter((a) => a.officeId === viewOffice && a.status === 'open').reduce((t, a) => t + a.amountUSD, 0))} to="/finance/advances" />
+          </dl>
+        </Panel>
+      )}
+      {canFin && !viewOffice && (<>{/* The two funding streams */}
       <Panel className="grid divide-y divide-line md:grid-cols-2 md:divide-x md:divide-y-0 md:rtl:divide-x-reverse">
         <FundBlock
           title={cash.name[lang]}
@@ -290,7 +317,7 @@ function HeadOfficeDashboard() {
       )}
 
       {canProj && (<>{/* Projects */}
-      <Panel title={ar ? 'المشاريع — الصرف مقابل السقف' : 'Projects — spending against ceiling'} aside={<UsageLegend />}>
+      <Panel title={ar ? 'المشاريع — الصرف مقابل السقف' : 'Projects — spending against ceiling'} aside={<span className="flex items-center gap-3">{viewOffice && <span className="text-[12.5px] text-muted">{ar ? 'السقوف مشتركة بين كل المكاتب' : 'Ceilings are shared by all offices'}</span>}<UsageLegend /></span>}>
         <ul className="divide-y divide-line">
           {s.projects.map((p) => {
             const u = projectUsage(p, s)
@@ -387,5 +414,22 @@ function Attention({ icon, title, sub, to, tone }: { icon: ReactNode; title: str
         </span>
       </Link>
     </li>
+  )
+}
+
+function OfficeFigure({ label, value, note, to }: { label: string; value: string; note?: string; to?: string }) {
+  const body = (
+    <div className="p-5">
+      <dt className="text-[13px] text-muted">{label}</dt>
+      <dd className="num mt-1 font-kufi text-[24px] font-bold leading-none">{value}</dd>
+      {note && <div className="mt-1 text-[12.5px] text-muted">{note}</div>}
+    </div>
+  )
+  return to ? (
+    <Link to={to} className="block hover:bg-paper">
+      {body}
+    </Link>
+  ) : (
+    body
   )
 }

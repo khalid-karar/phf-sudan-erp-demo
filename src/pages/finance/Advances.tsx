@@ -17,14 +17,14 @@ export function Advances() {
   const ar = lang === 'ar'
   const s = useStore()
   const user = useUser()
-  const { can, scopeOffice } = usePerm()
+  const { can, viewOffice } = usePerm()
   const [settling, setSettling] = useState<Advance | null>(null)
   const [filter, setFilter] = useState<'open' | 'settled' | 'all'>('open')
   const open = s.advances.filter((a) => a.status === 'open')
   const overdue = open.filter((a) => daysUntil(a.dueAt) < 0)
   const outstanding = open.reduce((t, a) => t + a.amountUSD, 0)
   const ready = open.filter((a) => activityFor(a.activityCode)?.report)
-  const list = s.advances.filter((a) => (!scopeOffice || a.officeId === scopeOffice) && (filter === 'all' || a.status === filter)).sort((a, b) => +new Date(a.dueAt) - +new Date(b.dueAt))
+  const list = s.advances.filter((a) => (!viewOffice || a.officeId === viewOffice) && (filter === 'all' || a.status === filter)).sort((a, b) => +new Date(a.dueAt) - +new Date(b.dueAt))
   void user
   const canSettle = can('finance', 'edit')
 

@@ -5,7 +5,7 @@ import type { Account, AccountType } from '../../data/types'
 import { balances, children, lineMatches, nextAccountCode } from '../../lib/ledger'
 import { date, usd } from '../../lib/format'
 import { useLang } from '../../lib/i18n'
-import { getOffices, usePerm, useStore, useUser } from '../../lib/store'
+import { getOffices, usePerm, useStore, useUser, useOfficeFilter } from '../../lib/store'
 
 export const typeName: Record<AccountType, { ar: string; en: string }> = {
   asset: { ar: 'أصول', en: 'Asset' },
@@ -70,7 +70,7 @@ function Tree({ onOpen }: { onOpen: (a: Account) => void }) {
   const lang = useLang()
   const ar = lang === 'ar'
   const s = useStore()
-  const [office, setOffice] = useState('')
+  const [office, setOffice] = useOfficeFilter()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState<Record<string, boolean>>({ '1': true, '11': true, '1101': true, '1102': true, '2': true, '3': true, '4': true, '5': true, '51': true, '52': true })
   const bal = useMemo(() => balances(s.accounts, s.journal, { officeId: office || undefined }), [s.accounts, s.journal, office])

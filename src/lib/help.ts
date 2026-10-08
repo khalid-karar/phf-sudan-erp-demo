@@ -445,6 +445,10 @@ export const faqs: { q: Bi; a: Bi }[] = [
     a: { ar: 'القائمة تعرض فقط ما يسمح به دورك. إذا احتجت وحدة إضافية اطلب من مسؤول النظام تعديل دورك في «الأدوار والصلاحيات».', en: 'The menu only shows what your role allows. If you need another module, ask the system administrator to adjust your role under “Roles & permissions”.' },
   },
   {
+    q: { ar: 'كيف أرى مكتباً واحداً فقط؟', en: 'How do I see just one office?' },
+    a: { ar: 'إذا كان دورك يرى كل المكاتب فستجد في أعلى الصفحة قائمة «كل المكاتب». اختر مكتباً فتعرض لوحة القيادة والطلبات والأنشطة والمالية وغيرها هذا المكتب فقط، ويُحفظ اختيارك. اضغط × للعودة إلى كل المكاتب. أما سقوف المشاريع فتبقى مشتركة بين المكاتب. من يعمل في مكتب واحد يرى مكتبه فقط ولا تظهر له القائمة.', en: 'If your role can see every office, you will find an “All offices” menu at the top of the page. Pick an office and the dashboard, requests, activities, finance and other pages show that office only; your choice is remembered. Press × to go back to all offices. Project ceilings stay shared across offices. People who work in a single office see only their own office and do not get the menu.' },
+  },
+  {
     q: { ar: 'رفضني النظام لأن المبلغ يتجاوز السقف. ماذا أفعل؟', en: 'The system stopped me because the amount exceeds the ceiling. What now?' },
     a: { ar: 'اطلب «إعادة تخصيص» لنقل مبلغ من بند آخر لديه متاح، أو قسّم الطلب. إعادة التخصيص تمرّ على اعتماد.', en: 'Request a “reallocation” to move money from another line that has room, or split the request. Reallocations go through approval.' },
   },

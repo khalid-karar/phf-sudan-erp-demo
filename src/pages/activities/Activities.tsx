@@ -10,7 +10,7 @@ import { activityMoney, activityStatus, statusName, statusTone, type ActivitySta
 import { findLine, lineUsage } from '../../lib/budget'
 import { date, num, relDays, usd } from '../../lib/format'
 import { useLang } from '../../lib/i18n'
-import { usePerm, useStore } from '../../lib/store'
+import { usePerm, useStore, useOfficeFilter } from '../../lib/store'
 
 export function StatusPill({ st }: { st: ActivityStatus }) {
   const lang = useLang()
@@ -24,7 +24,7 @@ export function Activities() {
   const { can, scopeOffice } = usePerm()
   const nav = useNavigate()
   const [params, setParams] = useSearchParams()
-  const [office, setOffice] = useState(scopeOffice ?? '')
+  const [office, setOffice] = useOfficeFilter()
   const [status, setStatus] = useState<ActivityStatus | ''>((params.get('status') as ActivityStatus) || '')
   const [q, setQ] = useState('')
   const [creating, setCreating] = useState(false)

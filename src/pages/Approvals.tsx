@@ -14,8 +14,8 @@ export function Approvals() {
   const s = useStore()
   const user = useUser()
   const mine = (steps: { role: string; status: string }[]) => steps.some((st) => st.status === 'pending' && st.role === user.role)
-  const { scopeOffice } = usePerm()
-  const reqs = s.requests.filter((r) => r.status === 'pending' && mine(r.steps) && (!scopeOffice || r.officeId === scopeOffice))
+  const { viewOffice } = usePerm()
+  const reqs = s.requests.filter((r) => r.status === 'pending' && mine(r.steps) && (!viewOffice || r.officeId === viewOffice))
   const ras = s.reallocations.filter((r) => r.status === 'pending' && mine(r.steps))
   const empty = reqs.length + ras.length === 0
 
