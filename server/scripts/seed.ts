@@ -17,6 +17,8 @@ import * as demoSeed from '../../src/data/seed'
 import * as demoFin from '../../src/data/finance'
 import * as demoSup from '../../src/data/supply'
 import * as demoPeople from '../../src/data/people'
+import * as demoProg from '../../src/data/programme'
+import { ensureSlots } from '../src/programme/slots'
 import { digits, nameKey } from '../src/patients/names'
 import { DEFAULT_RULES } from '../src/notifications/events'
 import type { JournalEntry } from '../../src/data/types'
@@ -26,7 +28,7 @@ const cents = (n: number) => toCents(n.toFixed(2))
 
 export async function seed(db: DbOrTx, password: string) {
   await db.execute(sql`
-    truncate deliveries, notification_recipients, notifications, notif_rules, deadlines, channel_settings, beneficiary_services, beneficiaries, payroll_runs, leave_requests, employee_allocations, employees, stock_moves, stock_levels, shipment_lines, shipments, fuel_logs, vehicles, items, audit_log, advance_items, advances, vouchers, period_closes, exchange_rates, journal_lines, journal_entries,
+    truncate donors, report_templates, deliveries, notification_recipients, notifications, notif_rules, deadlines, channel_settings, beneficiary_services, beneficiaries, payroll_runs, leave_requests, employee_allocations, employees, stock_moves, stock_levels, shipment_lines, shipments, fuel_logs, vehicles, items, audit_log, advance_items, advances, vouchers, period_closes, exchange_rates, journal_lines, journal_entries,
       ledger_accounts, approval_steps, reallocations, spend_requests, field_reports, activities, approval_rules,
       budget_lines, pillars, projects, funds, accounts, refresh_tokens, users, roles, offices, org_settings, doc_counters
     restart identity cascade`)
@@ -49,9 +51,10 @@ export async function seed(db: DbOrTx, password: string) {
   await db.insert(t.roles).values(
     demoSeed.roles.map((r) => ({ id: r.id, nameAr: r.name.ar, nameEn: r.name.en, descAr: r.description.ar, descEn: r.description.en, permissions: r.permissions, scope: r.scope, canApprove: r.canApprove, system: !!r.system })),
   )
+  await db.insert(t.donors).values(demoProg.donors.map((d) => ({ id: d.id, code: d.code, nameAr: d.name.ar, nameEn: d.name.en })))
   const passwordHash = await hashPassword(password)
   await db.insert(t.users).values(
-    demoSeed.users.map((u) => ({ id: u.id, email: u.email!, nameAr: u.name.ar, nameEn: u.name.en, phone: u.phone ?? null, passwordHash, roleId: u.role, officeId: u.officeId, active: u.active !== false })),
+    demoSeed.users.map((u) => ({ id: u.id, email: u.email!, nameAr: u.name.ar, nameEn: u.name.en, phone: u.phone ?? null, passwordHash, roleId: u.role, officeId: u.officeId, active: u.active !== false, donorId: u.donorId ?? null })),
   )
   for (const o of demoSeed.offices) if (o.managerId) await db.update(t.offices).set({ managerId: o.managerId }).where(eq(t.offices.id, o.id))
 
@@ -78,6 +81,7 @@ export async function seed(db: DbOrTx, password: string) {
       donorAr: p.donor.ar,
       donorEn: p.donor.en,
       fundId: p.fundId,
+      donorId: demoProg.projectDonor[p.id] ?? null,
       startDate: day(p.start),
       endDate: day(p.end),
       ceilingUsd: fromCents(ceiling),
@@ -375,7 +379,47 @@ export async function seed(db: DbOrTx, password: string) {
     { key: 'TR', next: maxNo(demoFin.fieldActivities.filter((a) => a.report).map((a) => a.report!.no)) + 1 },
   ]).onConflictDoUpdate({ target: t.docCounters.key, set: { next: sql`excluded.next` } })
 
+  await seedProgramme(db, activityId)
+
   return { journalEntries: journal.length, requests: s.requests.length, activities: demoFin.fieldActivities.length }
+}
+
+/** Project plans (sectors, objectives, team, milestones), report templates and the reporting calendar for the sample projects. */
+async function seedProgramme(db: DbOrTx, activityId: Map<string, string>) {
+  const objIds: Record<string, Record<string, string>> = {}
+  const indIds: Record<string, Record<string, string>> = {}
+  for (const tpl of demoProg.templates)
+    await db.insert(t.reportTemplates).values({ id: tpl.id, nameAr: tpl.name.ar, nameEn: tpl.name.en, sectorId: tpl.sectorId, fields: tpl.fields.map((f) => ({ ...f, columns: f.columns?.map((c) => ({ ...c, label: c.label })) })) })
+  for (const [pid, plan] of Object.entries(demoProg.plans)) {
+    objIds[pid] = {}
+    indIds[pid] = {}
+    await db.insert(t.projectSectors).values(plan.sectors.map((sectorId) => ({ projectId: pid, sectorId })))
+    for (const [oi, o] of plan.objectives.entries()) {
+      const [ob] = await db.insert(t.objectives).values({ projectId: pid, sectorId: o.sectorId, code: o.code, nameAr: o.name.ar, nameEn: o.name.en, sort: oi + 1 }).returning({ id: t.objectives.id })
+      objIds[pid][o.code] = ob.id
+      for (const [ii, i] of o.indicators.entries()) {
+        const [ind] = await db.insert(t.indicators).values({ objectiveId: ob.id, code: i.code, nameAr: i.name.ar, nameEn: i.name.en, unit: i.unit.en, target: String(i.target), source: i.source, sort: ii + 1 }).returning({ id: t.indicators.id })
+        indIds[pid][`${o.code}.${i.code}`] = ind.id
+      }
+    }
+    await db.insert(t.projectTeam).values(plan.team.map((m) => ({ projectId: pid, role: m.role, userId: m.userId, sectorId: m.sectorId ?? null })))
+    await db.insert(t.milestones).values(plan.milestones.map((m) => ({ projectId: pid, titleAr: m.title.ar, titleEn: m.title.en, due: demoProg.day(m.due), ownerId: m.ownerId, status: m.status, objectiveId: m.objective ? objIds[pid][m.objective] : null, notifyDaysBefore: m.notifyDaysBefore, doneAt: m.status === 'done' ? new Date() : null })))
+    await db.insert(t.reportingSchedules).values({ projectId: pid, enabled: true, ...plan.schedule })
+  }
+  for (const a of demoFin.fieldActivities) {
+    const code = demoProg.objectiveFor(a.projectId, a.type)
+    if (code && objIds[a.projectId]?.[code]) await db.update(t.activities).set({ objectiveId: objIds[a.projectId][code] }).where(eq(t.activities.id, activityId.get(a.code)!))
+  }
+  // The calendar, with the older months already released so the donor portal has something to show.
+  await ensureSlots(db)
+  const old = new Date(Date.now() - demoProg.RELEASED_BEFORE_DAYS * 86_400_000).toISOString().slice(0, 10)
+  const slots = await db.select().from(t.projectReports)
+  for (const r of slots) {
+    if (r.periodEnd >= old) continue
+    const content = demoProg.sampleContent(r.type, demoProg.plans[r.projectId], r.period, { objectives: objIds[r.projectId] ?? {}, indicators: indIds[r.projectId] ?? {} }, r.templateId)
+    const at = new Date(Date.parse(r.due) - 2 * 86_400_000)
+    await db.update(t.projectReports).set({ content, status: 'released', submittedAt: at, submittedById: r.type === 'narrative' ? 'u-pc' : 'u-pm', reviewedAt: at, reviewedById: 'u-pmo', releasedAt: at, releasedById: 'u-pmo' }).where(eq(t.projectReports.id, r.id))
+  }
 }
 
 if (require.main === module) {

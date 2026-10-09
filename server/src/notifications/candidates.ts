@@ -33,6 +33,26 @@ async function officeTeam(db: DbOrTx, officeId: string): Promise<string[]> {
   return r.map((x) => str(x.id))
 }
 
+const REPORT_NAME: Record<string, [string, string]> = {
+  statistics: ['التقرير الإحصائي', 'Statistics report'],
+  narrative: ['التقرير السردي', 'Narrative report'],
+  custom: ['التقرير المخصص', 'Custom report'],
+  quarterly: ['التقرير الربع سنوي', 'Quarterly report'],
+}
+const OWNER_ROLE: Record<string, string> = { statistics: 'project_manager', quarterly: 'project_manager', narrative: 'project_coordinator', custom: 'project_office' }
+
+async function teamOf(db: DbOrTx, projectId: string, role: string, sectorId?: string | null): Promise<string[]> {
+  const r = await rows(db, sql`select t.user_id, t.sector_id from project_team t join users u on u.id = t.user_id where t.project_id = ${projectId} and t.role = ${role}::team_role and u.active`)
+  return r.filter((x) => !sectorId || !x.sector_id || x.sector_id === sectorId).map((x) => str(x.user_id))
+}
+
+/** Who prepares a project report; the PMO (anyone who manages reports) when nobody is assigned. */
+async function reportOwners(db: DbOrTx, projectId: string, type: string, sectorId: string | null): Promise<string[]> {
+  const t = await teamOf(db, projectId, OWNER_ROLE[type] ?? 'project_manager', type === 'custom' ? sectorId : null)
+  if (t.length) return t
+  return (await rows(db, sql`select u.id from users u join roles ro on ro.id = u.role_id where u.active and u.donor_id is null and ro.permissions->>'reports' = 'manage'`)).map((x) => str(x.id))
+}
+
 export async function candidatesFor(db: DbOrTx, event: NotifEvent, threshold: number | null): Promise<Candidate[]> {
   const out: Candidate[] = []
   switch (event) {
@@ -182,6 +202,70 @@ export async function candidatesFor(db: DbOrTx, event: NotifEvent, threshold: nu
         link: '/finance/close',
         concerned: [],
       })
+      break
+    }
+    case 'project_report_due':
+    case 'project_report_overdue': {
+      const over = event === 'project_report_overdue'
+      const rs = await rows(db, sql`
+        select r.id, r.project_id, r.type::text as type, r.period, r.sector_id, r.due::text as due, p.code, (r.due - current_date) as left
+        from project_reports r join projects p on p.id = r.project_id join reporting_schedules sc on sc.project_id = r.project_id
+        where r.status in ('open', 'draft', 'returned') and ${over ? sql`r.due < current_date` : sql`r.due >= current_date and r.due - current_date <= sc.notify_days_before`}`)
+      for (const r of rs) {
+        const left = Number(r.left)
+        const [kar, ken] = REPORT_NAME[str(r.type)] ?? ['تقرير', 'Report']
+        out.push({
+          key: `${event}:${r.id}:${r.due}`,
+          severity: over ? 'critical' : left <= 2 ? 'warn' : 'info',
+          titleAr: over ? `تقرير متأخر: ${kar} ${r.period} — ${r.code}` : `موعد تقرير قريب: ${kar} ${r.period} — ${r.code}`,
+          titleEn: over ? `Overdue: ${ken} ${r.period} — ${r.code}` : `Report due soon: ${ken} ${r.period} — ${r.code}`,
+          bodyAr: over ? `كان الموعد قبل ${-left} يوم` : left === 0 ? 'الموعد اليوم' : `يتبقى ${left} يوم`,
+          bodyEn: over ? `It was due ${-left} days ago` : left === 0 ? 'Due today' : `${left} days left`,
+          link: `/reports/project/${r.id}`,
+          concerned: await reportOwners(db, str(r.project_id), str(r.type), r.sector_id ? str(r.sector_id) : null),
+        })
+      }
+      break
+    }
+    case 'project_report_submitted': {
+      const rs = await rows(db, sql`select r.id, r.type::text as type, r.period, r.submitted_by_id, r.submitted_at::text as at, p.code from project_reports r join projects p on p.id = r.project_id where r.status = 'submitted'`)
+      const reviewers = await rows(db, sql`select u.id from users u join roles ro on ro.id = u.role_id where u.active and u.donor_id is null and ro.permissions->>'reports' = 'manage'`)
+      for (const r of rs) {
+        const [kar, ken] = REPORT_NAME[str(r.type)] ?? ['تقرير', 'Report']
+        out.push({ key: `${event}:${r.id}:${r.at}`, severity: 'info', titleAr: `بانتظار مراجعتك: ${kar} ${r.period} — ${r.code}`, titleEn: `Waiting for your review: ${ken} ${r.period} — ${r.code}`, bodyAr: 'أُرسل إلى مكتب إدارة المشاريع', bodyEn: 'Submitted to the PMO', link: `/reports/project/${r.id}`, concerned: reviewers.map((x) => str(x.id)).filter((id) => id !== str(r.submitted_by_id)) })
+      }
+      break
+    }
+    case 'project_report_returned': {
+      const rs = await rows(db, sql`select r.id, r.project_id, r.type::text as type, r.period, r.sector_id, r.submitted_by_id, r.review_note, r.reviewed_at::text as at, p.code from project_reports r join projects p on p.id = r.project_id where r.status = 'returned' and r.reviewed_at >= now() - interval '14 days'`)
+      for (const r of rs) {
+        const [kar, ken] = REPORT_NAME[str(r.type)] ?? ['تقرير', 'Report']
+        const who = new Set(await reportOwners(db, str(r.project_id), str(r.type), r.sector_id ? str(r.sector_id) : null))
+        if (r.submitted_by_id) who.add(str(r.submitted_by_id))
+        out.push({ key: `${event}:${r.id}:${r.at}`, severity: 'warn', titleAr: `أُعيد للتعديل: ${kar} ${r.period} — ${r.code}`, titleEn: `Returned for changes: ${ken} ${r.period} — ${r.code}`, bodyAr: str(r.review_note), bodyEn: str(r.review_note), link: `/reports/project/${r.id}`, concerned: [...who] })
+      }
+      break
+    }
+    case 'milestone_due':
+    case 'milestone_overdue': {
+      const over = event === 'milestone_overdue'
+      const ms = await rows(db, sql`
+        select m.id, m.project_id, m.title_ar, m.title_en, m.due::text as due, m.owner_id, p.code, (m.due - current_date) as left
+        from milestones m join projects p on p.id = m.project_id
+        where m.status <> 'done' and ${over ? sql`m.due < current_date` : sql`m.due >= current_date and m.due - current_date <= m.notify_days_before`}`)
+      for (const m of ms) {
+        const left = Number(m.left)
+        out.push({
+          key: `${event}:${m.id}:${m.due}`,
+          severity: over ? 'critical' : left <= 2 ? 'warn' : 'info',
+          titleAr: over ? `معلم متأخر: ${m.title_ar} — ${m.code}` : `معلم قريب: ${m.title_ar} — ${m.code}`,
+          titleEn: over ? `Milestone overdue: ${m.title_en} — ${m.code}` : `Milestone coming up: ${m.title_en} — ${m.code}`,
+          bodyAr: over ? `كان الموعد قبل ${-left} يوم` : left === 0 ? 'الموعد اليوم' : `يتبقى ${left} يوم`,
+          bodyEn: over ? `It was due ${-left} days ago` : left === 0 ? 'Due today' : `${left} days left`,
+          link: '/programme/milestones',
+          concerned: m.owner_id ? [str(m.owner_id)] : await teamOf(db, str(m.project_id), 'project_manager'),
+        })
+      }
       break
     }
     case 'low_stock': {

@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { Zod } from '../common/zod'
 import type { AuthUser } from './auth-user'
 import { AuthService } from './auth.service'
-import { AllowPendingPasswordChange, CurrentUser, Public } from './decorators'
+import { AllowPendingPasswordChange, CurrentUser, DonorOk, Public } from './decorators'
 import { passwordRule } from './passwords'
 
 const loginBody = z.object({ email: z.string().email(), password: z.string().min(1).max(200) })
@@ -40,12 +40,14 @@ export class AuthController {
   }
 
   @AllowPendingPasswordChange()
+  @DonorOk()
   @Get('me')
   me(@CurrentUser() u: AuthUser) {
     return this.auth.me(u)
   }
 
   @AllowPendingPasswordChange()
+  @DonorOk()
   @Post('change-password')
   @HttpCode(204)
   async change(@CurrentUser() u: AuthUser, @Body(new Zod(changeBody)) b: z.infer<typeof changeBody>) {

@@ -15,6 +15,7 @@ export interface AuthUser {
   canApprove: boolean
   permissions: Record<string, Access>
   mustChangePassword: boolean
+  donorId: string | null // set for a donor representative: only the donor portal is open to them
   ip?: string
 }
 

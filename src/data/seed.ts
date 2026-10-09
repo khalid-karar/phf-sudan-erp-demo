@@ -56,6 +56,12 @@ export const users: User[] = [
   { id: 'u-hr', name: { ar: 'سلمى حسن بشير', en: 'Salma Hassan Bashir' }, role: 'hr_officer', officeId: 'khr', email: 'hr@kphfs.org', phone: '+249 912 345 009', active: true },
   { id: 'u-reg', name: { ar: 'رحاب الأمين', en: 'Rehab Elamin' }, role: 'registrar', officeId: 'ksl', email: 'r.elamin@kphfs.org', phone: '+249 912 345 010', active: true },
   { id: 'u-admin', name: { ar: 'م. خالد الطيب', en: 'Eng. Khalid Eltayeb' }, role: 'admin', officeId: 'khr', email: 'it@kphfs.org', phone: '+249 912 345 011', active: true },
+  { id: 'u-pmo', name: { ar: 'هالة عبدالله مصطفى', en: 'Hala Abdalla Mustafa' }, role: 'pmo', officeId: 'khr', email: 'pmo@kphfs.org', phone: '+249 912 345 012', active: true },
+  { id: 'u-pm', name: { ar: 'عمر الصادق بابكر', en: 'Omer Elsadig Babiker' }, role: 'project_manager', officeId: 'khr', email: 'pm@kphfs.org', phone: '+249 912 345 013', active: true },
+  { id: 'u-pc', name: { ar: 'نسرين محمد خير', en: 'Nisreen Mohamed Kheir' }, role: 'project_coordinator', officeId: 'khr', email: 'coordinator@kphfs.org', phone: '+249 912 345 014', active: true },
+  { id: 'u-poh', name: { ar: 'د. أسامة إبراهيم', en: 'Dr. Osama Ibrahim' }, role: 'project_office', officeId: 'ksl', email: 'health.office@kphfs.org', phone: '+249 912 345 015', active: true },
+  { id: 'u-pon', name: { ar: 'تسنيم عوض الله', en: 'Tasneem Awadalla' }, role: 'project_office', officeId: 'fsh', email: 'nutrition.office@kphfs.org', phone: '+249 912 345 016', active: true },
+  { id: 'u-donor', name: { ar: 'ممثل المانح (أ)', en: 'Donor A representative' }, role: 'donor_viewer', officeId: 'khr', email: 'donor.a@example.org', active: true, donorId: 'don-a' },
 ]
 
 type P = Record<ModuleKey, Access>
@@ -159,6 +165,47 @@ export const roles: Role[] = [
     permissions: perms({ activities: 'view', patients: 'manage' }),
     scope: 'office',
     canApprove: false,
+  },
+  {
+    id: 'pmo',
+    name: { ar: 'مكتب إدارة المشاريع (PMO)', en: 'Project management office (PMO)' },
+    description: { ar: 'يراجع كل تقارير المشاريع ويعتمدها ثم يفرج عنها للمانح', en: 'Reviews and approves every project report, then releases it to the donor' },
+    permissions: perms({ projects: 'edit', activities: 'view', patients: 'view', reports: 'manage' }),
+    scope: 'all',
+    canApprove: false,
+  },
+  {
+    id: 'project_manager',
+    name: { ar: 'مدير المشروع', en: 'Project manager' },
+    description: { ar: 'يعدّ التقرير الإحصائي الشهري والتقرير الربع سنوي', en: 'Prepares the monthly statistics report and the quarterly report' },
+    permissions: perms({ projects: 'edit', activities: 'view', patients: 'view', reports: 'edit' }),
+    scope: 'all',
+    canApprove: false,
+  },
+  {
+    id: 'project_coordinator',
+    name: { ar: 'منسق المشروع', en: 'Project coordinator' },
+    description: { ar: 'يعدّ التقرير السردي الشهري', en: 'Prepares the monthly narrative report' },
+    permissions: perms({ projects: 'view', activities: 'view', reports: 'edit' }),
+    scope: 'all',
+    canApprove: false,
+  },
+  {
+    id: 'project_office',
+    name: { ar: 'مكتب المشروع (تغذية / صحة)', en: 'Project office (nutrition / health)' },
+    description: { ar: 'يعدّ التقرير الشهري المخصص لقطاعه', en: 'Prepares the custom monthly report for its sector' },
+    permissions: perms({ projects: 'view', activities: 'view', reports: 'edit' }),
+    scope: 'all',
+    canApprove: false,
+  },
+  {
+    id: 'donor_viewer',
+    name: { ar: 'ممثل الجهة المانحة (عرض فقط)', en: 'Donor representative (view only)' },
+    description: { ar: 'يرى التقارير التي أُفرج عنها لجهته فقط', en: 'Sees only the reports released to their own donor' },
+    permissions: perms({ dashboard: 'none', alerts: 'none' }),
+    scope: 'all',
+    canApprove: false,
+    system: true,
   },
 ]
 

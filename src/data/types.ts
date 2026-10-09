@@ -27,6 +27,7 @@ export interface User {
   email?: string
   phone?: string
   active?: boolean
+  donorId?: string // a donor representative: sees the donor portal only
 }
 
 export interface Office {
