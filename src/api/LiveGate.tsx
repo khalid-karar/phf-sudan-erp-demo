@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Field, inputCls } from '../components/ui'
+import { useSession } from '../lib/session'
 import { useStore } from '../lib/store'
 import { ApiError, changePassword, hasRefreshToken, login, resume, whenSignedOut } from './http'
 import { SecretDialog } from './secret'
@@ -174,7 +175,7 @@ export function LiveGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (phase !== 'ready') return
     const t = setInterval(() => {
-      if (document.visibilityState === 'visible') void refreshInbox().catch(() => undefined)
+      if (document.visibilityState === 'visible' && !useSession.getState().donorId) void refreshInbox().catch(() => undefined)
     }, 60_000)
     return () => clearInterval(t)
   }, [phase])

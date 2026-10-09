@@ -1,4 +1,5 @@
 // Live mode runtime: loads data into the store, refreshes it after a change, and turns failures into messages.
+import { useSession } from '../lib/session'
 import { useStore } from '../lib/store'
 import { api, ApiError, logout as apiLogout } from './http'
 import { mapInbox } from './map'
@@ -10,6 +11,13 @@ const clean = (o: Patch) => Object.fromEntries(Object.entries(o).filter(([, v]) 
 
 /** After sign-in: who this is, the organisation, and all the data their role can see. */
 export async function bootstrapLive() {
+  // A donor representative gets the portal only: the server refuses every other route to them.
+  const who = await api.get<import('./dto').MeDto>('/auth/me')
+  if (who.donorId) {
+    useSession.setState({ donorId: who.donorId, name: { ar: who.nameAr, en: who.nameEn } })
+    return who
+  }
+  useSession.setState({ donorId: null, name: null })
   const { me, ...core } = await loadCore(useStore.getState().org)
   const data = await loadData(me.id, me.role.permissions)
   // The signed-in person's own role is in /auth/me even if the roles list is short.

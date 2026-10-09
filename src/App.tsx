@@ -49,6 +49,9 @@ import { ProgrammeSetup } from './pages/programme/Setup'
 import { MilestonesPage } from './pages/programme/Milestones'
 import { ProjectReport, ProjectReports } from './pages/programme/Reports'
 import { TemplatesPage } from './pages/programme/Templates'
+import { DonorPortal } from './pages/programme/DonorPortal'
+import { useSession } from './lib/session'
+import { useStore } from './lib/store'
 import { Donors } from './pages/settings/Donors'
 
 const routes: [string, React.ReactNode][] = [
@@ -109,25 +112,34 @@ const routes: [string, React.ReactNode][] = [
   ['/alerts/calendar', <Calendar />],
 ]
 
+function Root() {
+  const live = useSession((x) => x.donorId)
+  const demo = useStore((x) => (LIVE ? undefined : x.users.find((u) => u.id === x.userId)?.donorId))
+  if (live || demo) return <DonorPortal />
+  return (
+    <Routes>
+      <Route path="/login" element={LIVE ? <Navigate to="/" replace /> : <Login />} />
+      <Route
+        path="*"
+        element={
+          <Layout>
+            <Routes>
+              {routes.map(([path, el]) => (
+                <Route key={path} path={path} element={<Guard>{el}</Guard>} />
+              ))}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Layout>
+        }
+      />
+    </Routes>
+  )
+}
+
 export default function App() {
   const app = (
     <HashRouter>
-      <Routes>
-        <Route path="/login" element={LIVE ? <Navigate to="/" replace /> : <Login />} />
-        <Route
-          path="*"
-          element={
-            <Layout>
-              <Routes>
-                {routes.map(([path, el]) => (
-                  <Route key={path} path={path} element={<Guard>{el}</Guard>} />
-                ))}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Layout>
-          }
-        />
-      </Routes>
+      <Root />
     </HashRouter>
   )
   return LIVE ? <LiveGate>{app}</LiveGate> : app

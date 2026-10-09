@@ -19,6 +19,7 @@ export interface MeDto {
   nameEn: string
   officeId: string
   mustChangePassword: boolean
+  donorId?: string | null
   role: { id: string; nameAr: string; nameEn: string; scope: 'office' | 'all'; canApprove: boolean; permissions: Record<string, 'none' | 'view' | 'edit' | 'manage'> }
 }
 export interface OrgDto {

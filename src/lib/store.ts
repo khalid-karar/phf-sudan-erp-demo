@@ -580,6 +580,7 @@ export const useStore = create<State>()(
   reset: () => {
     try {
       localStorage.removeItem('phf-procurement-demo')
+      localStorage.removeItem('phf-programme-demo-v1')
     } catch {
       /* storage blocked */
     }
