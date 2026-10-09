@@ -1,6 +1,9 @@
 import { BellRing, Check, ChevronLeft, ChevronRight, Plus, Repeat, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { backend, useLoad } from '../../api/programme'
+import type { Milestone, ReportRow } from '../../api/programme'
+import { TYPE_LABEL } from '../../lib/programme'
 import { Button, Field, inputCls, Modal, PageHeader, Panel } from '../../components/ui'
 import type { Deadline } from '../../data/types'
 import { date, daysUntil, relDays } from '../../lib/format'
@@ -11,7 +14,7 @@ interface CalItem {
   id: string
   at: Date
   title: string
-  kind: 'deadline' | 'activity' | 'advance'
+  kind: 'deadline' | 'activity' | 'advance' | 'report' | 'milestone'
   link: string
   deadline?: Deadline
   late?: boolean
@@ -48,7 +51,9 @@ export function Calendar() {
     return new Date(n.getFullYear(), n.getMonth(), 1)
   })
   const [edit, setEdit] = useState<Deadline | null>(null)
-  const [show, setShow] = useState({ deadline: true, activity: true, advance: true })
+  const [show, setShow] = useState({ deadline: true, activity: true, advance: true, report: true, milestone: true })
+  const reports = useLoad(() => (can('reports', 'view') ? backend.reports() : Promise.resolve([] as ReportRow[])), [], [] as ReportRow[])
+  const milestones = useLoad(() => (can('projects', 'view') ? backend.milestones() : Promise.resolve([] as Milestone[])), [], [] as Milestone[])
 
   const monthStart = cursor
   const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 23, 59)
@@ -67,8 +72,18 @@ export function Calendar() {
       const at = new Date(x.dueAt)
       if (at >= monthStart && at <= monthEnd) out.push({ id: x.id, at, title: ar ? `تسوية ${x.no}` : `Settle ${x.no}`, kind: 'advance', link: '/finance/advances', late: +at < Date.now() })
     }
+    for (const r of reports.data) {
+      if (['submitted', 'approved', 'released'].includes(r.status)) continue
+      const at = new Date(r.due + 'T12:00:00')
+      if (at >= monthStart && at <= monthEnd) out.push({ id: `rep-${r.id}`, at, title: `${r.projectCode} · ${TYPE_LABEL[r.type][lang]}`, kind: 'report', link: `/reports/project/${r.id}`, late: r.overdue })
+    }
+    for (const m of milestones.data) {
+      if (m.status === 'done') continue
+      const at = new Date(m.due + 'T12:00:00')
+      if (at >= monthStart && at <= monthEnd) out.push({ id: `ms-${m.id}`, at, title: ar ? m.titleAr : m.titleEn, kind: 'milestone', link: '/programme/milestones', late: +at < Date.now() })
+    }
     return out.filter((i) => show[i.kind])
-  }, [s.deadlines, s.activities, s.advances, monthStart, monthEnd, lang, ar, viewOffice, show])
+  }, [reports.data, milestones.data, s.deadlines, s.activities, s.advances, monthStart, monthEnd, lang, ar, viewOffice, show])
 
   // Grid starts on the organisation's chosen week start.
   const ws = { sat: 6, sun: 0, mon: 1 }[s.org.weekStartsOn]
@@ -81,7 +96,7 @@ export function Calendar() {
   const weekdays = Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(ar ? 'ar' : 'en-GB', { weekday: 'short' }).format(new Date(2024, 0, 7 + ((ws + i) % 7))))
   const monthLabel = new Intl.DateTimeFormat(ar ? 'ar-SD-u-nu-latn' : 'en-GB', { month: 'long', year: 'numeric' }).format(cursor)
   const today = new Date()
-  const tone = { deadline: 'bg-nile text-white', activity: 'bg-leaf-soft text-leaf', advance: 'bg-amber-soft text-amber' }
+  const tone = { deadline: 'bg-nile text-white', activity: 'bg-leaf-soft text-leaf', advance: 'bg-amber-soft text-amber', report: 'bg-sky-100 text-sky-900', milestone: 'bg-indigo-100 text-indigo-900' }
 
   const upcoming = s.deadlines
     .filter((d) => !d.done)
@@ -119,7 +134,9 @@ export function Calendar() {
             <div className="flex flex-wrap gap-3 text-[12.5px]">
               {(
                 [
-                  ['deadline', ar ? 'مواعيد التقارير' : 'Report deadlines'],
+                  ['deadline', ar ? 'مواعيد عامة' : 'General deadlines'],
+                  ['report', ar ? 'تقارير المشاريع' : 'Project reports'],
+                  ['milestone', ar ? 'مراحل المشاريع' : 'Milestones'],
                   ['activity', ar ? 'الأنشطة' : 'Activities'],
                   ['advance', ar ? 'تسوية العهد' : 'Advance settlements'],
                 ] as const
