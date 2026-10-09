@@ -3,6 +3,7 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, ApiError, LIVE } from '../api/http'
 import { errorText, refreshData } from '../api/live'
+import { backend, useLoad } from '../api/programme'
 import { parseIce, type IceParsed } from '../lib/ice/ice'
 import { localAccount } from '../lib/ice/natures'
 import { useLang } from '../lib/i18n'
@@ -65,6 +66,8 @@ export function ImportBudgetModal({ onClose }: { onClose: () => void }) {
   const toast = useStore((s) => s.toast)
   const st = useStore()
   const [parsed, setParsed] = useState<IceParsed | null>(null)
+  const donors = useLoad(() => backend.donors(), [], [])
+  const [donorId, setDonorId] = useState('')
   const input = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [pv, setPv] = useState<Preview | null>(null)
@@ -73,7 +76,7 @@ export function ImportBudgetModal({ onClose }: { onClose: () => void }) {
   const [f, setF] = useState({ id: '', code: '', nameAr: '', nameEn: '', donorAr: '', donorEn: '', startDate: '', endDate: '', rate: '', controlMode: 'hard', tolerancePct: '10' })
   const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }))
 
-  const pick = async (fl: File | null) => {
+  const pick = async (fl: File | null, donor = donorId) => {
     setFile(fl)
     setPv(null)
     setErr('')
@@ -84,9 +87,10 @@ export function ImportBudgetModal({ onClose }: { onClose: () => void }) {
       if (LIVE) {
         const fd = new FormData()
         fd.append('file', fl)
+        if (donor) fd.append('donorId', donor)
         p = await api.upload<Preview>('/projects/import/preview', fd)
       } else {
-        const parsed = await parseIce(await fl.arrayBuffer())
+        const parsed = await parseIce(await fl.arrayBuffer(), donor ? { headers: await backend.importProfile(donor) } : undefined)
         setParsed(parsed)
         p = summarize(parsed)
       }
@@ -125,14 +129,17 @@ export function ImportBudgetModal({ onClose }: { onClose: () => void }) {
             return { code: code.slice(0, 20), name: { ar: title, en: title }, lines: ls.map((l) => ({ code: `B${String(++seq).padStart(3, '0')}`, name: { ar: `${l.item}${l.state ? ` [${l.state}]` : ''}`, en: `${l.item}${l.state ? ` [${l.state}]` : ''}` }, ceilingUSD: Number(l.totalUsd), account: acc(l.nature), detail: { activityCode: l.activityCode, fundCode: l.fundCode, state: l.state, nature: l.nature, donorAccount: l.donorAccount } })) }
           }),
         })
+        if (donorId) { const np = useStore.getState().projects.find((x) => x.code === f.code.trim()); if (np) await backend.linkDonor(np.id, donorId).catch(() => undefined) }
         onClose()
         nav('/projects')
         return
       }
       const fd = new FormData()
       fd.append('file', file)
+      if (donorId) fd.append('donorId', donorId)
       for (const [k, v] of Object.entries(f)) if (v !== '' && !(k === 'tolerancePct' && f.controlMode !== 'soft')) fd.append(k, v)
       const r = await api.upload<{ id: string; lines: number; activities: number }>('/projects/import', fd)
+      if (donorId) await backend.linkDonor(r.id, donorId).catch(() => undefined)
       await refreshData()
       toast({ ar: `أُنشئ المشروع من الملف: ${r.activities} نشاطاً و${r.lines} بنداً`, en: `Project created from the file: ${r.activities} activities, ${r.lines} lines` }, 'ok')
       onClose()
@@ -151,6 +158,12 @@ export function ImportBudgetModal({ onClose }: { onClose: () => void }) {
         <p className="text-[13.5px] text-muted">
           {ar ? 'ارفع ملف الميزانية (Excel) الذي أرسله المانح. يُنشأ المشروع ومحاوره (الأنشطة) وبنوده وسقوفها تلقائياً بدل الإدخال اليدوي، ويُحفظ الملف الأصلي مع المشروع.' : 'Upload the budget workbook (Excel) from the donor. The project, its activities and budget lines with their ceilings are created automatically instead of typing them, and the original file is kept with the project.'}
         </p>
+        <Field label={ar ? 'الجهة الممولة (تحدد أسماء أعمدة الملف)' : 'Funding entity (decides the file’s column names)'}>
+          <select className={inputCls} value={donorId} onChange={(e) => { const d = donors.data.find((x) => x.id === e.target.value); setDonorId(e.target.value); if (d) setF((x) => ({ ...x, donorAr: d.nameAr, donorEn: d.nameEn })); if (file) void pick(file, e.target.value) }}>
+            <option value="">{ar ? 'نموذج ICE القياسي' : 'Standard ICE layout'}</option>
+            {donors.data.map((d) => (<option key={d.id} value={d.id}>{ar ? d.nameAr : d.nameEn}</option>))}
+          </select>
+        </Field>
         <input ref={input} type="file" accept=".xlsx" hidden onChange={(e) => pick(e.target.files?.[0] ?? null)} />
         <button type="button" onClick={() => input.current?.click()} className="flex w-full items-center gap-3 rounded-lg border-2 border-dashed border-line p-4 text-start hover:border-nile-2">
           {file ? <FileSpreadsheet className="text-leaf" /> : <Upload className="text-muted" />}

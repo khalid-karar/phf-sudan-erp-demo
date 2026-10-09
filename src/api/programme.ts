@@ -61,6 +61,8 @@ export interface Backend {
   linkDonor(projectId: string, donorId: string | null): Promise<void>
   projectDonors(): Promise<Record<string, string | null>>
   donorUsers(donorId: string): Promise<DonorUser[]>
+  importProfile(donorId: string): Promise<Record<string, string[]>>
+  saveImportProfile(donorId: string, headers: Record<string, string[]>): Promise<void>
   addDonorUser(donorId: string, u: { email: string; nameAr: string; nameEn: string }): Promise<DonorUser>
 
   plan(projectId: string): Promise<Plan>
@@ -110,6 +112,8 @@ const liveBackend: Backend = {
   addSector: async (id, nameAr, nameEn) => void (await api.post('/programme/sectors', { id, nameAr, nameEn })),
   donors: () => api.get('/donors'),
   saveDonor: (id, d) => (id ? api.patch<Donor>(`/donors/${id}`, d) : api.post<Donor>('/donors', d)),
+  importProfile: async (id) => (await api.get<{ headers: Record<string, string[]> }>(`/donors/${id}/import-profile`)).headers,
+  saveImportProfile: async (id, headers) => void (await api.put(`/donors/${id}/import-profile`, { headers })),
   linkDonor: async (projectId, donorId) => void (await api.put(`/donors/link/${projectId}`, { donorId })),
   projectDonors: async () => {
     const ps = await api.get<{ id: string; donorId?: string | null }[]>('/projects')
@@ -313,7 +317,13 @@ function save() {
   }
 }
 /** Called by "Reset demo" so the programme data starts over too. */
+const PROFILE_KEY = 'phf-donor-profiles-demo'
 export function resetProgrammeDemo() {
+  try {
+    localStorage.removeItem(PROFILE_KEY)
+  } catch {
+    /* ignore */
+  }
   cache = null
   try {
     localStorage.removeItem(KEY)
@@ -472,6 +482,27 @@ const demoBackend: Backend = {
     }
     save()
     return out
+  },
+  importProfile: async (id) => {
+    try {
+      return JSON.parse(localStorage.getItem(PROFILE_KEY) ?? '{}')[id] ?? {}
+    } catch {
+      return {}
+    }
+  },
+  saveImportProfile: async (id, headers) => {
+    let all: Record<string, Record<string, string[]>> = {}
+    try {
+      all = JSON.parse(localStorage.getItem(PROFILE_KEY) ?? '{}')
+    } catch {
+      /* start empty */
+    }
+    all[id] = headers
+    try {
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(all))
+    } catch {
+      /* blocked */
+    }
   },
   linkDonor: async (projectId, donorId) => {
     needPlanEdit()

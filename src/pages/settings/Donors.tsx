@@ -6,6 +6,47 @@ import { Button, Field, PageHeader, Panel, inputCls } from '../../components/ui'
 import { useLang } from '../../lib/i18n'
 import { usePerm } from '../../lib/store'
 
+const FIELDS: { key: string; ar: string; en: string; def: string }[] = [
+  { key: 'id', ar: 'رمز النشاط', en: 'Activity code', def: 'Activity ID' },
+  { key: 'title', ar: 'عنوان النشاط', en: 'Activity title', def: 'Activity Title' },
+  { key: 'desc', ar: 'وصف النشاط', en: 'Activity description', def: 'Activity Description' },
+  { key: 'item', ar: 'بند الميزانية', en: 'Budget item', def: 'Budget Item' },
+  { key: 'state', ar: 'الولاية (اختياري)', en: 'State (optional)', def: 'State' },
+  { key: 'nature', ar: 'طبيعة المعاملة', en: 'Nature of transaction', def: 'Nature' },
+  { key: 'fund', ar: 'الصندوق', en: 'Fund', def: 'Fund' },
+  { key: 'unit', ar: 'وحدة القياس', en: 'Unit of measure', def: 'Unit of Measure' },
+  { key: 'qty', ar: 'الكمية', en: 'Quantity', def: 'Unit Quantity' },
+  { key: 'dur', ar: 'المدة', en: 'Duration', def: 'Duration' },
+  { key: 'cost', ar: 'تكلفة الوحدة', en: 'Unit cost', def: 'Unit Cost' },
+]
+
+function ImportProfile({ donorId, canEdit }: { donorId: string; canEdit: boolean }) {
+  const ar = useLang() === 'ar'
+  const doIt = useDo()
+  const prof = useLoad(() => backend.importProfile(donorId), [donorId], {} as Record<string, string[]>)
+  const [edit, setEdit] = useState<Record<string, string> | null>(null)
+  const cur = (k: string) => edit?.[k] ?? (prof.data[k] ?? []).join(', ')
+  const save = async () => {
+    const headers: Record<string, string[]> = {}
+    for (const f of FIELDS) { const v = cur(f.key).split(',').map((x) => x.trim()).filter(Boolean); if (v.length) headers[f.key] = v }
+    if (await doIt(() => backend.saveImportProfile(donorId, headers), { ar: 'حُفظ نموذج الاستيراد', en: 'Import layout saved' })) { setEdit(null); await prof.reload() }
+  }
+  return (
+    <div className="border-t border-line p-5">
+      <h3 className="mb-1 text-[14.5px] font-semibold">{ar ? 'نموذج استيراد الميزانية لهذه الجهة' : 'Budget import layout for this entity'}</h3>
+      <p className="mb-3 text-[13px] text-muted">{ar ? 'اكتب أسماء الأعمدة كما تظهر في ملف الجهة (أو بدايتها، افصل البدائل بفاصلة). الحقل الفارغ يعني الاسم القياسي في نموذج ICE.' : 'Type the column names as they appear in this entity’s file (or their beginning; separate alternatives with a comma). An empty field means the standard ICE name.'}</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        {FIELDS.map((f) => (
+          <Field key={f.key} label={ar ? f.ar : f.en}>
+            <input className={inputCls} disabled={!canEdit} placeholder={f.def} value={cur(f.key)} onChange={(e) => setEdit({ ...(edit ?? {}), [f.key]: e.target.value })} />
+          </Field>
+        ))}
+      </div>
+      {canEdit && <div className="mt-3"><Button onClick={() => void save()}>{ar ? 'حفظ' : 'Save'}</Button></div>}
+    </div>
+  )
+}
+
 export function Donors() {
   const ar = useLang() === 'ar'
   const { can } = usePerm()
@@ -57,6 +98,7 @@ export function Donors() {
             </div>
           )}
         </Panel>
+        {sel && <Panel title={ar ? 'نموذج استيراد الميزانية' : 'Budget import layout'} className="xl:col-span-2"><ImportProfile key={sel} donorId={sel} canEdit={canEdit} /></Panel>}
       </div>
     </div>
   )
