@@ -115,10 +115,7 @@ const liveBackend: Backend = {
   importProfile: async (id) => (await api.get<{ headers: Record<string, string[]> }>(`/donors/${id}/import-profile`)).headers,
   saveImportProfile: async (id, headers) => void (await api.put(`/donors/${id}/import-profile`, { headers })),
   linkDonor: async (projectId, donorId) => void (await api.put(`/donors/link/${projectId}`, { donorId })),
-  projectDonors: async () => {
-    const ps = await api.get<{ id: string; donorId?: string | null }[]>('/projects')
-    return Object.fromEntries(ps.map((p) => [p.id, p.donorId ?? null]))
-  },
+  projectDonors: () => api.get('/donors/links'),
   donorUsers: (id) => api.get(`/donors/${id}/users`),
   addDonorUser: (id, u) => api.post(`/donors/${id}/users`, u),
 

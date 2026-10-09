@@ -322,6 +322,7 @@ describe('donor portal', () => {
     expect((await admin.post('/donors', { code: 'DON-C', nameAr: 'x', nameEn: 'x' })).status).toBe(409)
     expect((await pm.post('/donors', { code: 'DON-D', nameAr: 'x', nameEn: 'x' })).status).toBe(403)
     expect((await admin.put('/donors/link/pb', { donorId: d.body.id })).status).toBe(200)
+    expect((await admin.get('/donors/links')).body.pb).toBe(d.body.id)
     const u = await admin.post(`/donors/${d.body.id}/users`, { email: 'rep@donor-c.org', nameAr: 'ممثل', nameEn: 'Rep' })
     expect(u.status, JSON.stringify(u.body)).toBe(201)
     expect(u.body.temporaryPassword).toMatch(/^Phf-/)

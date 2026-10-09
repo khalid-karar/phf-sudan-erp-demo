@@ -99,6 +99,8 @@ export class DonorsController {
   users(@Param('id') id: string) { return this.svc.listUsers(id) }
   @Perm('settings', 'manage') @Post(':id/users')
   addUser(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new Zod(donorUserBody)) b: B<typeof donorUserBody>) { return this.svc.createUser(u, id, b) }
+  @Perm('projects', 'view') @Get('links')
+  links() { return this.svc.links() }
   @Perm('projects', 'view') @Get(':id/import-profile')
   profile(@Param('id') id: string) { return this.svc.importProfile(id) }
   @Perm('settings', 'manage') @Put(':id/import-profile')

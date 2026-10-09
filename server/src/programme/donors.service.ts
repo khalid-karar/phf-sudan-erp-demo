@@ -58,6 +58,12 @@ export class DonorsService {
     return d
   }
 
+  /** Which funding entity each project is linked to. */
+  async links() {
+    const rows = await this.db.select({ id: projects.id, donorId: projects.donorId }).from(projects)
+    return Object.fromEntries(rows.map((r) => [r.id, r.donorId ?? null]))
+  }
+
   /** The column names this donor uses in its budget workbook; empty means the ICE default. */
   async importProfile(donorId: string) {
     const [d] = await this.db.select({ id: donors.id }).from(donors).where(eq(donors.id, donorId))
