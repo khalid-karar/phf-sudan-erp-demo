@@ -8,7 +8,7 @@ import type { Db } from '../db/client'
 import { DB } from '../db/db.module'
 import { roles, users } from '../db/schema'
 import { can, type Access, type AuthUser, type ModuleKey } from './auth-user'
-import { ALLOW_PW_CHANGE, IS_PUBLIC, PERM } from './decorators'
+import { ALLOW_PW_CHANGE, DONOR_OK, IS_PUBLIC, PERM } from './decorators'
 
 const unauthenticated = () => new AppError(401, 'UNAUTHENTICATED', { ar: 'يرجى تسجيل الدخول', en: 'Please sign in' })
 
@@ -55,6 +55,7 @@ export class AuthGuard implements CanActivate {
       canApprove: row.r.canApprove,
       permissions: row.r.permissions,
       mustChangePassword: row.u.mustChangePassword,
+      donorId: row.u.donorId,
       ip: req.ip,
     }
     req.user = user
@@ -62,6 +63,8 @@ export class AuthGuard implements CanActivate {
     if (user.mustChangePassword && !this.reflector.getAllAndOverride<boolean>(ALLOW_PW_CHANGE, targets)) {
       throw new AppError(403, 'PASSWORD_CHANGE_REQUIRED', { ar: 'يجب تغيير كلمة المرور المؤقتة أولاً', en: 'Change your temporary password first' })
     }
+    // A donor representative gets the portal routes and nothing else, whatever their role's permissions say.
+    if (user.donorId && !this.reflector.getAllAndOverride<boolean>(DONOR_OK, targets)) throw forbidden()
     const perm = this.reflector.getAllAndOverride<{ module: ModuleKey; level: Access } | undefined>(PERM, targets)
     if (perm && !can(user, perm.module, perm.level)) throw forbidden()
     return true

@@ -1,4 +1,4 @@
-export const EVENTS = ['approval_waiting', 'request_stale', 'request_decided', 'deadline_near', 'deadline_overdue', 'advance_overdue', 'report_overdue', 'line_threshold', 'spend_no_report', 'month_close', 'low_stock'] as const
+export const EVENTS = ['approval_waiting', 'request_stale', 'request_decided', 'deadline_near', 'deadline_overdue', 'advance_overdue', 'report_overdue', 'line_threshold', 'spend_no_report', 'month_close', 'low_stock', 'project_report_due', 'project_report_overdue', 'project_report_submitted', 'project_report_returned', 'milestone_due', 'milestone_overdue'] as const
 export type NotifEvent = (typeof EVENTS)[number]
 
 /** Events whose rule takes a number, with its unit and a sensible default. */
@@ -26,4 +26,10 @@ export const DEFAULT_RULES: Rule[] = [
   { event: 'spend_no_report', nameAr: 'صرف بلا تقرير فني', nameEn: 'Spending with no field report', threshold: 10, recipients: { concerned: true, roles: ['accountant'], users: [] }, channels: ch(false, false, false), enabled: true },
   { event: 'month_close', nameAr: 'الإقفال الشهري لم يكتمل', nameEn: 'Monthly close not finished', threshold: 5, recipients: { concerned: false, roles: ['finance_manager'], users: [] }, channels: ch(true, false, false), enabled: true },
   { event: 'low_stock', nameAr: 'مخزون صنف تحت الحد الأدنى', nameEn: 'Stock below minimum', recipients: { concerned: true, roles: ['logistics_officer'], users: [] }, channels: ch(false, true, false), enabled: true },
+  { event: 'project_report_due', nameAr: 'اقتراب موعد تسليم تقرير مشروع', nameEn: 'A project report is due soon', recipients: { concerned: true, roles: [], users: [] }, channels: ch(true, false, false), enabled: true },
+  { event: 'project_report_overdue', nameAr: 'تقرير مشروع متأخر', nameEn: 'A project report is overdue', recipients: { concerned: true, roles: ['pmo'], users: [] }, channels: ch(true, false, true), enabled: true },
+  { event: 'project_report_submitted', nameAr: 'تقرير بانتظار مراجعة PMO', nameEn: 'A report is waiting for PMO review', recipients: { concerned: true, roles: [], users: [] }, channels: ch(true, false, false), enabled: true },
+  { event: 'project_report_returned', nameAr: 'أُعيد تقريرك للتعديل', nameEn: 'Your report was returned for changes', recipients: { concerned: true, roles: [], users: [] }, channels: ch(true, true, false), enabled: true },
+  { event: 'milestone_due', nameAr: 'اقتراب موعد معلم في مشروع', nameEn: 'A project milestone is coming up', recipients: { concerned: true, roles: [], users: [] }, channels: ch(true, false, false), enabled: true },
+  { event: 'milestone_overdue', nameAr: 'معلم مشروع متأخر', nameEn: 'A project milestone is overdue', recipients: { concerned: true, roles: ['pmo'], users: [] }, channels: ch(true, false, true), enabled: true },
 ]

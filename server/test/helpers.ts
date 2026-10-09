@@ -11,6 +11,12 @@ process.env.UPLOAD_DIR = process.env.UPLOAD_DIR ?? `${process.env.TMPDIR ?? '/tm
 
 export const USERS = {
   fieldOfficer: 'm.osman@kphfs.org', // Kassala, office-scoped
+  pmo: 'pmo@kphfs.org',
+  projectManager: 'pm@kphfs.org',
+  coordinator: 'coordinator@kphfs.org',
+  healthOffice: 'health.office@kphfs.org',
+  nutritionOffice: 'nutrition.office@kphfs.org',
+  donor: 'donor.a@example.org',
   fieldOfficerFsh: 'a.haroun@kphfs.org', // El Fasher
   supervisor: 's.eltayeb@kphfs.org',
   financeManager: 'finance@kphfs.org',

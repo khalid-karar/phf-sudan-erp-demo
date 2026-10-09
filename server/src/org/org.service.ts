@@ -139,6 +139,7 @@ export class OrgService {
     return this.db
       .select({ id: users.id, email: users.email, nameAr: users.nameAr, nameEn: users.nameEn, roleId: users.roleId, officeId: users.officeId, active: users.active })
       .from(users)
+      .where(sql`${users.donorId} is null`) // donor representatives are not colleagues
       .orderBy(asc(users.nameEn))
   }
 

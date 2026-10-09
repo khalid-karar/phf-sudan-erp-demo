@@ -95,6 +95,7 @@ export const users = pgTable('users', {
   roleId: text('role_id').notNull().references(() => roles.id),
   officeId: text('office_id').notNull().references(() => offices.id),
   active: boolean('active').notNull().default(true),
+  donorId: text('donor_id').references((): AnyPgColumn => donors.id), // set for a donor representative: sees only the portal
   failedLogins: integer('failed_logins').notNull().default(0),
   lockedUntil: ts('locked_until'),
   lastLoginAt: ts('last_login_at'),
@@ -160,6 +161,7 @@ export const projects = pgTable('projects', {
   donorAr: text('donor_ar').notNull(),
   donorEn: text('donor_en').notNull(),
   fundId: text('fund_id').references(() => funds.id),
+  donorId: text('donor_id').references((): AnyPgColumn => donors.id), // the funding entity that sees this project's released reports
   startDate: date('start_date').notNull(),
   endDate: date('end_date').notNull(),
   ceilingUsd: usd('ceiling_usd').notNull(),
@@ -271,6 +273,7 @@ export const activities = pgTable(
     location: text('location'),
     plannedUsd: usd('planned_usd'),
     inKind: boolean('in_kind').notNull().default(false), // funded with supplies only; no cash spending expected
+    objectiveId: text('objective_id').references((): AnyPgColumn => objectives.id, { onDelete: 'set null' }), // which project objective the activity serves
     createdById: text('created_by_id').references(() => users.id),
     createdAt: createdAt(),
   },
@@ -962,3 +965,159 @@ export const procurementCases = pgTable(
   },
   (t) => [index('procurement_office_status').on(t.officeId, t.status)],
 )
+
+
+// ─── Programme management: donors, objectives, team, milestones, reporting ────
+
+export const donors = pgTable('donors', {
+  id: text('id').primaryKey(),
+  code: text('code').notNull().unique(),
+  nameAr: text('name_ar').notNull(),
+  nameEn: text('name_en').notNull(),
+  active: boolean('active').notNull().default(true),
+  createdAt: createdAt(),
+})
+
+export const sectors = pgTable('sectors', {
+  id: text('id').primaryKey(),
+  nameAr: text('name_ar').notNull(),
+  nameEn: text('name_en').notNull(),
+  sort: integer('sort').notNull().default(0),
+})
+
+export const projectSectors = pgTable(
+  'project_sectors',
+  {
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    sectorId: text('sector_id').notNull().references(() => sectors.id),
+  },
+  (t) => [primaryKey({ columns: [t.projectId, t.sectorId] })],
+)
+
+export const objectives = pgTable(
+  'objectives',
+  {
+    id: id(),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    sectorId: text('sector_id').references(() => sectors.id),
+    code: text('code').notNull(),
+    nameAr: text('name_ar').notNull(),
+    nameEn: text('name_en').notNull(),
+    sort: integer('sort').notNull().default(0),
+  },
+  (t) => [uniqueIndex('objectives_project_code').on(t.projectId, t.code)],
+)
+
+export const INDICATOR_SOURCES = ['manual', 'beneficiaries', 'services', 'activities', 'field_beneficiaries'] as const
+export type IndicatorSource = (typeof INDICATOR_SOURCES)[number]
+
+export const indicators = pgTable(
+  'indicators',
+  {
+    id: id(),
+    objectiveId: text('objective_id').notNull().references(() => objectives.id, { onDelete: 'cascade' }),
+    code: text('code').notNull(),
+    nameAr: text('name_ar').notNull(),
+    nameEn: text('name_en').notNull(),
+    unit: text('unit').notNull().default(''),
+    target: numeric('target', { precision: 18, scale: 2 }),
+    source: text('source').$type<IndicatorSource>().notNull().default('manual'),
+    sort: integer('sort').notNull().default(0),
+  },
+  (t) => [uniqueIndex('indicators_objective_code').on(t.objectiveId, t.code)],
+)
+
+export const teamRole = pgEnum('team_role', ['project_manager', 'project_coordinator', 'project_office'])
+
+export const projectTeam = pgTable(
+  'project_team',
+  {
+    id: id(),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    role: teamRole('role').notNull(),
+    userId: text('user_id').notNull().references(() => users.id),
+    sectorId: text('sector_id').references(() => sectors.id),
+  },
+  (t) => [uniqueIndex('project_team_member').on(t.projectId, t.role, t.userId)],
+)
+
+export const milestoneStatus = pgEnum('milestone_status', ['planned', 'in_progress', 'done', 'delayed'])
+
+export const milestones = pgTable(
+  'milestones',
+  {
+    id: id(),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    titleAr: text('title_ar').notNull(),
+    titleEn: text('title_en').notNull(),
+    due: date('due').notNull(),
+    ownerId: text('owner_id').references(() => users.id),
+    status: milestoneStatus('status').notNull().default('planned'),
+    objectiveId: text('objective_id').references(() => objectives.id, { onDelete: 'set null' }),
+    activityId: text('activity_id').references(() => activities.id, { onDelete: 'set null' }),
+    notifyDaysBefore: integer('notify_days_before').notNull().default(7),
+    doneAt: ts('done_at'),
+    createdById: text('created_by_id').references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [index('milestones_project_due').on(t.projectId, t.due)],
+)
+
+export type TemplateField = { key: string; label: { ar: string; en: string }; type: 'text' | 'longtext' | 'number' | 'date' | 'choice' | 'table'; required?: boolean; options?: string[]; columns?: { key: string; label: { ar: string; en: string }; type: 'text' | 'number' }[] }
+
+export const reportTemplates = pgTable('report_templates', {
+  id: id(),
+  nameAr: text('name_ar').notNull(),
+  nameEn: text('name_en').notNull(),
+  sectorId: text('sector_id').references(() => sectors.id),
+  fields: jsonb('fields').$type<TemplateField[]>().notNull(),
+  active: boolean('active').notNull().default(true),
+  createdAt: createdAt(),
+})
+
+export const reportingSchedules = pgTable('reporting_schedules', {
+  projectId: text('project_id').primaryKey().references(() => projects.id, { onDelete: 'cascade' }),
+  enabled: boolean('enabled').notNull().default(true),
+  monthlyDueDay: integer('monthly_due_day').notNull().default(10),
+  quarterlyDueDay: integer('quarterly_due_day').notNull().default(20),
+  notifyDaysBefore: integer('notify_days_before').notNull().default(5),
+})
+
+export const projectReportType = pgEnum('project_report_type', ['statistics', 'narrative', 'custom', 'quarterly'])
+export const projectReportStatus = pgEnum('project_report_status', ['open', 'draft', 'submitted', 'returned', 'approved', 'released'])
+
+export const projectReports = pgTable(
+  'project_reports',
+  {
+    id: id(),
+    projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    type: projectReportType('type').notNull(),
+    period: text('period').notNull(),
+    periodStart: date('period_start').notNull(),
+    periodEnd: date('period_end').notNull(),
+    due: date('due').notNull(),
+    sectorId: text('sector_id').references(() => sectors.id),
+    templateId: text('template_id').references(() => reportTemplates.id),
+    status: projectReportStatus('status').notNull().default('open'),
+    content: jsonb('content').$type<Record<string, unknown>>().notNull().default({}),
+    submittedAt: ts('submitted_at'),
+    submittedById: text('submitted_by_id').references(() => users.id),
+    reviewedAt: ts('reviewed_at'),
+    reviewedById: text('reviewed_by_id').references(() => users.id),
+    reviewNote: text('review_note'),
+    releasedAt: ts('released_at'),
+    releasedById: text('released_by_id').references(() => users.id),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('project_reports_slot').on(t.projectId, t.type, t.period, sql`coalesce(${t.sectorId}, '')`), index('project_reports_status_due').on(t.status, t.due)],
+)
+
+export const projectReportEvents = pgTable('project_report_events', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  reportId: text('report_id').notNull().references(() => projectReports.id, { onDelete: 'cascade' }),
+  at: ts('at').notNull().defaultNow(),
+  userId: text('user_id').references(() => users.id),
+  action: text('action').notNull(),
+  note: text('note'),
+})

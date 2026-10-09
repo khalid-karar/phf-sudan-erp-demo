@@ -102,6 +102,7 @@ export class AuthService {
       nameEn: user.nameEn,
       officeId: user.officeId,
       mustChangePassword: user.mustChangePassword,
+      donorId: user.donorId,
       role: { id: r.id, nameAr: r.nameAr, nameEn: r.nameEn, scope: r.scope, canApprove: r.canApprove, permissions: r.permissions },
     }
   }

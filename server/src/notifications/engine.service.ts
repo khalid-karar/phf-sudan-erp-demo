@@ -4,6 +4,7 @@ import { env } from '../config/env'
 import type { Db, DbOrTx } from '../db/client'
 import { DB } from '../db/db.module'
 import { channelSettings, deliveries, notificationRecipients, notifications, notifRules, orgSettings, users } from '../db/schema'
+import { ensureSlots } from '../programme/slots'
 import { candidatesFor, usersForRole } from './candidates'
 import { cleanAddress, CHANNELS, defaultConfig, notReady, openConfig, type Channel, type ChannelConfigs } from './channels'
 import { EVENTS, type NotifEvent } from './events'
@@ -87,6 +88,7 @@ export class NotificationEngine implements OnModuleInit, OnModuleDestroy {
       const lang = org?.lang === 'en' ? 'en' : 'ar'
       const configs = await loadChannelConfigs(tx)
       const rules = await tx.select().from(notifRules).where(eq(notifRules.enabled, true))
+      await ensureSlots(tx) // report slots for the current month/quarter exist before due dates are checked
       let created = 0
       let queued = 0
       for (const rule of rules) {
