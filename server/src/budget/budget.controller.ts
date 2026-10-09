@@ -7,7 +7,7 @@ import { CurrentUser, Perm } from '../auth/decorators'
 import { Zod } from '../common/zod'
 import { checkBody, controlBody, linkBody, linePatch, projectBody } from './budget.schemas'
 import { BudgetService } from './budget.service'
-import { IceService, iceFields } from './ice.service'
+import { IceService, iceFields, previewFields } from './ice.service'
 import { NATURES } from './natures'
 
 @Controller('projects')
@@ -21,8 +21,8 @@ export class BudgetController {
   @Perm('projects', 'manage')
   @Post('import/preview')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
-  importPreview(@UploadedFile() file: { buffer: Buffer } | undefined) {
-    return this.ice.preview(file)
+  importPreview(@UploadedFile() file: { buffer: Buffer } | undefined, @Body(new Zod(previewFields)) b: z.infer<typeof previewFields>) {
+    return this.ice.preview(file, b.donorId)
   }
 
   /** Creates the project, its activities and budget lines from a donor budget file, and keeps the file with the project. */

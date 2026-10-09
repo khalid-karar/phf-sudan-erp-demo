@@ -6,7 +6,7 @@ import { audit } from '../common/audit'
 import { unprocessable } from '../common/errors'
 import type { Db } from '../db/client'
 import { DB } from '../db/db.module'
-import { accounts, attachments } from '../db/schema'
+import { accounts, attachments, donorImportProfiles } from '../db/schema'
 import { and, eq } from 'drizzle-orm'
 import { fromCents, toCents } from '../lib/money'
 import { BudgetService } from './budget.service'
@@ -14,7 +14,9 @@ import { localAccount } from './natures'
 import { parseIce, type IceParsed } from './ice'
 import { isoDate } from '../common/zod'
 
+export const previewFields = z.object({ donorId: z.string().max(60).optional() })
 export const iceFields = z.object({
+  donorId: z.string().max(60).optional(),
   id: z.string().regex(/^[a-z0-9-]{2,40}$/),
   code: z.string().trim().min(1).max(30).optional(),
   nameAr: z.string().trim().min(1).max(300),
@@ -44,10 +46,12 @@ export class IceService {
     private readonly budget: BudgetService,
   ) {}
 
-  private async read(file: { buffer: Buffer } | undefined): Promise<IceParsed> {
+  private async read(file: { buffer: Buffer } | undefined, donorId?: string): Promise<IceParsed> {
     if (!file?.buffer?.length) throw unprocessable('NO_FILE', { ar: 'لم يُرفق ملف', en: 'No file was attached' })
+    // Each funding entity can name its columns differently; without a saved profile the ICE layout is used.
+    const prof = donorId ? (await this.db.select().from(donorImportProfiles).where(eq(donorImportProfiles.donorId, donorId)))[0] : undefined
     try {
-      return await parseIce(file.buffer)
+      return await parseIce(file.buffer, prof ? { headers: prof.headers } : undefined)
     } catch (e) {
       throw bad(e)
     }
@@ -88,13 +92,13 @@ export class IceService {
     }
   }
 
-  async preview(file: { buffer: Buffer } | undefined) {
-    return this.summary(await this.read(file))
+  async preview(file: { buffer: Buffer } | undefined, donorId?: string) {
+    return this.summary(await this.read(file, donorId))
   }
 
   /** Builds the project, its activities (pillars) and budget lines from the file and keeps the file with the project. */
   async import(user: AuthUser, file: { buffer: Buffer; originalname?: string } | undefined, f: z.infer<typeof iceFields>) {
-    const p = await this.read(file)
+    const p = await this.read(file, f.donorId)
     const buf = file!.buffer
     const order: string[] = []
     const groups = new Map<string, typeof p.lines>()

@@ -4,7 +4,7 @@ import type { z } from 'zod'
 import type { AuthUser } from '../auth/auth-user'
 import { CurrentUser, DonorOk, Perm } from '../auth/decorators'
 import { Zod } from '../common/zod'
-import { donorBody, donorPatch, donorUserBody, DonorsService, linkDonorBody, portalExpQuery, portalQuery } from './donors.service'
+import { donorBody, donorPatch, donorUserBody, importProfileBody, DonorsService, linkDonorBody, portalExpQuery, portalQuery } from './donors.service'
 import { ProgrammeService } from './programme.service'
 import { ProjectReportsService } from './project-reports.service'
 import * as s from './programme.schemas'
@@ -99,6 +99,10 @@ export class DonorsController {
   users(@Param('id') id: string) { return this.svc.listUsers(id) }
   @Perm('settings', 'manage') @Post(':id/users')
   addUser(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new Zod(donorUserBody)) b: B<typeof donorUserBody>) { return this.svc.createUser(u, id, b) }
+  @Perm('projects', 'view') @Get(':id/import-profile')
+  profile(@Param('id') id: string) { return this.svc.importProfile(id) }
+  @Perm('settings', 'manage') @Put(':id/import-profile')
+  saveProfile(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new Zod(importProfileBody)) b: B<typeof importProfileBody>) { return this.svc.saveImportProfile(u, id, b) }
   @Perm('projects', 'edit') @Put('link/:projectId')
   link(@CurrentUser() u: AuthUser, @Param('projectId') projectId: string, @Body(new Zod(linkDonorBody)) b: B<typeof linkDonorBody>) { return this.svc.linkProject(u, projectId, b.donorId) }
 }

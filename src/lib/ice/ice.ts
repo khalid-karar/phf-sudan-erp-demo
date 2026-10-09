@@ -19,6 +19,34 @@ export interface IceLine {
   nature: string | null
   donorAccount: string | null
 }
+/** What one funding entity calls its columns. Lists are header prefixes, case-insensitive; a missing list means the ICE default. */
+export type IceField = 'state' | 'id' | 'title' | 'desc' | 'item' | 'nature' | 'fund' | 'unit' | 'qty' | 'dur' | 'cost'
+export interface IceProfile {
+  headers: Partial<Record<IceField, string[]>>
+}
+export const ICE_DEFAULT_HEADERS: Record<IceField, string[]> = {
+  state: ['state'],
+  id: ['activity id'],
+  title: ['activity title'],
+  desc: ['activity description'],
+  item: ['budget item'],
+  nature: ['nature'],
+  fund: ['fund'],
+  unit: ['unit of measure'],
+  qty: ['unit quantity'],
+  dur: ['duration'],
+  cost: ['unit cost'],
+}
+const FIELD_ORDER: IceField[] = ['state', 'id', 'title', 'desc', 'item', 'nature', 'fund', 'unit', 'qty', 'dur', 'cost']
+const headersOf = (p?: IceProfile): Record<IceField, string[]> => {
+  const out = { ...ICE_DEFAULT_HEADERS }
+  for (const k of FIELD_ORDER) {
+    const v = p?.headers?.[k]?.map((x) => x.trim().toLowerCase()).filter(Boolean)
+    if (v?.length) out[k] = v
+  }
+  return out
+}
+
 export interface IceParsed {
   ipCode: string | null
   rate: number | null
@@ -68,7 +96,7 @@ export function normalizeState(s: string): string {
   return s.replace(/\s+/g, ' ').trim()
 }
 
-export async function parseIce(buf: ArrayBuffer): Promise<IceParsed> {
+export async function parseIce(buf: ArrayBuffer, profile?: IceProfile): Promise<IceParsed> {
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
   try {
@@ -76,12 +104,14 @@ export async function parseIce(buf: ArrayBuffer): Promise<IceParsed> {
   } catch {
     throw new Error('NOT_XLSX')
   }
+  const heads = headersOf(profile)
+  const idHeads = heads.id
   // The sheet whose header row has "Activity ID" and "Unit Cost" — the visible one named ICE… first.
   const cands = wb.worksheets.filter((w) => w.state === 'visible')
   const find = (ws: import('exceljs').Worksheet) => {
     for (let r = 1; r <= Math.min(ws.rowCount, 40); r++) {
       const cells = ws.getRow(r)
-      for (let c = 1; c <= 30; c++) if (/^activity id/i.test(str(cells.getCell(c).value))) return r
+      for (let c = 1; c <= 30; c++) if (idHeads.some((h) => str(cells.getCell(c).value).toLowerCase().startsWith(h))) return r
     }
     return 0
   }
@@ -94,20 +124,12 @@ export async function parseIce(buf: ArrayBuffer): Promise<IceParsed> {
   for (let c = 1; c <= 40; c++) {
     const h = str(ws.getRow(hr).getCell(c).value).toLowerCase()
     if (!h) continue
-    if (h.startsWith('state')) col.state ??= c
-    else if (h.startsWith('activity id')) col.id ??= c
-    else if (h.startsWith('activity title')) col.title ??= c
-    else if (h.startsWith('activity description')) col.desc ??= c
-    else if (h.startsWith('budget item')) col.item ??= c
-    else if (h.startsWith('nature')) col.nature ??= c
-    else if (h.startsWith('fund')) col.fund ??= c
-    else if (h.startsWith('unit of measure')) col.unit ??= c
-    else if (h.startsWith('unit quantity')) col.qty ??= c
-    else if (h.startsWith('duration')) col.dur ??= c
-    else if (h.startsWith('unit cost')) unitCosts.push(c)
+    const hit = FIELD_ORDER.find((k) => heads[k].some((x) => h.startsWith(x)))
+    if (hit === 'cost') unitCosts.push(c)
+    else if (hit) col[hit] ??= c
   }
   col.cost = unitCosts[0]
-  for (const k of ['state', 'id', 'item', 'qty', 'dur', 'cost']) if (!col[k]) throw new Error('NO_COLUMN:' + k)
+  for (const k of ['id', 'item', 'qty', 'dur', 'cost']) if (!col[k]) throw new Error('NO_COLUMN:' + k)
 
   // Header block above the table: "IP Code:", "Transaction currency:", "Exchange rate…", "Period:".
   let ipCode: string | null = null
@@ -135,7 +157,7 @@ export async function parseIce(buf: ArrayBuffer): Promise<IceParsed> {
     const id = str(row.getCell(col.id).value)
     const item = str(row.getCell(col.item).value)
     if (!id && !item) continue
-    if (/^x+$/i.test(id) || /^x+$/i.test(str(row.getCell(col.state).value))) break // the "X" sentinel row before the totals
+    if (/^x+$/i.test(id) || (!!col.state && /^x+$/i.test(str(row.getCell(col.state).value)))) break // the "X" sentinel row before the totals
     if (!id) {
       warnings.push({ row: r, en: 'Row has no Activity ID — skipped', ar: 'سطر بلا رمز نشاط — تم تجاهله' })
       continue
@@ -156,7 +178,7 @@ export async function parseIce(buf: ArrayBuffer): Promise<IceParsed> {
     const nat = natureByName(natName) ?? natureByName(guessNature(item || str(col.desc ? row.getCell(col.desc).value : '')))
     lines.push({
       row: r,
-      state: normalizeState(str(row.getCell(col.state).value)),
+      state: normalizeState(col.state ? str(row.getCell(col.state).value) : ''),
       activityCode: id,
       activityTitle: col.title ? str(row.getCell(col.title).value) : id,
       description: col.desc ? str(row.getCell(col.desc).value) : '',

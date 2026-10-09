@@ -978,6 +978,12 @@ export const donors = pgTable('donors', {
   createdAt: createdAt(),
 })
 
+export const donorImportProfiles = pgTable('donor_import_profiles', {
+  donorId: text('donor_id').primaryKey().references(() => donors.id, { onDelete: 'cascade' }),
+  headers: jsonb('headers').$type<Record<string, string[]>>().notNull().default({}),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+})
+
 export const sectors = pgTable('sectors', {
   id: text('id').primaryKey(),
   nameAr: text('name_ar').notNull(),

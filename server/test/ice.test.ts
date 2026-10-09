@@ -97,3 +97,30 @@ describe('donor budget file import', () => {
     expect((await fm.patch(`/projects/lines/${line.id}`, { nature: 'nonsense' })).status).toBe(422)
   })
 })
+
+describe('a funding entity with its own column names', () => {
+  /** Same shape of data, but this donor calls the columns something else and has no State column. */
+  async function makeOther() {
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet('Budget')
+    ;['Ref', 'Heading', 'Cost line', 'Qty', 'No. of days', 'Price per unit'].forEach((h, i) => (ws.getRow(2).getCell(1 + i).value = h))
+    ;[['A1', 'Training', 'Trainer fees', 4, 5, 100], ['A1', 'Training', 'Venue', 1, 5, 80], ['B2', 'Supplies', 'Kits', 10, 1, 25]].forEach((r, i) => r.forEach((v, j) => (ws.getRow(3 + i).getCell(1 + j).value = v)))
+    return Buffer.from(await wb.xlsx.writeBuffer())
+  }
+  const headers = { id: ['ref'], title: ['heading'], item: ['cost line'], qty: ['qty'], dur: ['no. of days'], cost: ['price per unit'] }
+
+  it('is refused with the ICE layout, then read once the donor profile is saved', async () => {
+    const admin = await Client.as(app, USERS.admin)
+    const donor = (await admin.get('/donors')).body[0].id as string
+    const file = await makeOther()
+    expect((await post(fm, '/projects/import/preview', file)).status).toBe(422)
+    expect((await post(fm, '/projects/import/preview', file, { donorId: donor })).status).toBe(422) // nothing saved yet
+    expect((await fo.put(`/donors/${donor}/import-profile`, { headers })).status).toBe(403)
+    expect((await admin.put(`/donors/${donor}/import-profile`, { headers })).status).toBe(200)
+    expect((await fm.get(`/donors/${donor}/import-profile`)).body.headers.cost).toEqual(['price per unit'])
+    const r = await post(fm, '/projects/import/preview', file, { donorId: donor })
+    expect(r.status).toBe(201)
+    expect(r.body).toMatchObject({ lineCount: 3, totalUsd: '2650.00' })
+    expect(r.body.activities.map((a: { code: string; usd: string }) => [a.code, a.usd])).toEqual([['A1', '2400.00'], ['B2', '250.00']])
+  })
+})

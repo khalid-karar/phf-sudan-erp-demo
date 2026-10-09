@@ -8,7 +8,7 @@ import { audit } from '../common/audit'
 import { conflict, forbidden, notFound, unprocessable } from '../common/errors'
 import type { Db } from '../db/client'
 import { DB } from '../db/db.module'
-import { donors, offices, projectReports, projects, users } from '../db/schema'
+import { donorImportProfiles, donors, offices, projectReports, projects, users } from '../db/schema'
 import { ExpenditureService } from '../reports/expenditure.service'
 import { ProjectReportsService } from './project-reports.service'
 
@@ -16,6 +16,8 @@ const s = (n = 200) => z.string().trim().max(n)
 export const donorBody = z.object({ code: s(30).min(1), nameAr: s().min(1), nameEn: s().min(1), active: z.boolean().default(true) })
 export const donorPatch = donorBody.partial()
 export const donorUserBody = z.object({ email: z.string().trim().toLowerCase().email().max(200), nameAr: s().min(1), nameEn: s().min(1), phone: s(40).optional() })
+const FIELDS = ['state', 'id', 'title', 'desc', 'item', 'nature', 'fund', 'unit', 'qty', 'dur', 'cost'] as const
+export const importProfileBody = z.object({ headers: z.object(Object.fromEntries(FIELDS.map((f) => [f, z.array(s(80).min(1)).max(8).optional()])) as Record<(typeof FIELDS)[number], z.ZodOptional<z.ZodArray<z.ZodString>>>) })
 export const linkDonorBody = z.object({ donorId: z.string().nullable() })
 export const portalQuery = z.object({ projectId: z.string().optional(), type: z.enum(['statistics', 'narrative', 'custom', 'quarterly']).optional() })
 export const portalExpQuery = z.object({ currency: z.enum(['SDG', 'USD']).default('USD') })
@@ -54,6 +56,22 @@ export class DonorsService {
     if (!d) throw notFound({ ar: 'الجهة المانحة', en: 'Donor' })
     await audit(this.db, user, 'donor.update', 'donor', id, b)
     return d
+  }
+
+  /** The column names this donor uses in its budget workbook; empty means the ICE default. */
+  async importProfile(donorId: string) {
+    const [d] = await this.db.select({ id: donors.id }).from(donors).where(eq(donors.id, donorId))
+    if (!d) throw notFound({ ar: 'الجهة الممولة', en: 'Funding entity' })
+    const [p] = await this.db.select().from(donorImportProfiles).where(eq(donorImportProfiles.donorId, donorId))
+    return { donorId, headers: p?.headers ?? {} }
+  }
+
+  async saveImportProfile(user: AuthUser, donorId: string, b: z.infer<typeof importProfileBody>) {
+    await this.importProfile(donorId)
+    const headers = Object.fromEntries(Object.entries(b.headers).filter(([, v]) => v && v.length))
+    await this.db.insert(donorImportProfiles).values({ donorId, headers }).onConflictDoUpdate({ target: donorImportProfiles.donorId, set: { headers, updatedAt: new Date() } })
+    await audit(this.db, user, 'donor.import_profile', 'donor', donorId, { fields: Object.keys(headers) })
+    return { donorId, headers }
   }
 
   async linkProject(user: AuthUser, projectId: string, donorId: string | null) {
