@@ -45,6 +45,12 @@ import { Inbox } from './pages/alerts/Inbox'
 import { Channels } from './pages/settings/Channels'
 import { NotificationRules } from './pages/settings/NotificationRules'
 
+import { ProgrammeSetup } from './pages/programme/Setup'
+import { MilestonesPage } from './pages/programme/Milestones'
+import { ProjectReport, ProjectReports } from './pages/programme/Reports'
+import { TemplatesPage } from './pages/programme/Templates'
+import { Donors } from './pages/settings/Donors'
+
 const routes: [string, React.ReactNode][] = [
   ['/', <Dashboard />],
   ['/projects', <ProjectsList />],
@@ -92,6 +98,12 @@ const routes: [string, React.ReactNode][] = [
   ['/hr/payroll', <Payroll />],
   ['/patients', <Beneficiaries />],
   ['/patients/stats', <PatientStats />],
+  ['/programme/setup', <ProgrammeSetup />],
+  ['/programme/milestones', <MilestonesPage />],
+  ['/reports/project', <ProjectReports />],
+  ['/reports/project/:id', <ProjectReport />],
+  ['/reports/templates', <TemplatesPage />],
+  ['/settings/donors', <Donors />],
   ['/help', <HelpCentre />],
   ['/alerts', <Inbox />],
   ['/alerts/calendar', <Calendar />],
