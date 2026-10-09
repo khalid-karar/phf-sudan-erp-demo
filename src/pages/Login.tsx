@@ -50,25 +50,13 @@ export function Login() {
       <div className="flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md">
           <h2 className="text-[24px] font-bold">{ar ? 'تسجيل الدخول' : 'Sign in'}</h2>
-          <div className="mt-6 space-y-4">
-            <Field label={ar ? 'البريد الإلكتروني' : 'Email'}>
-              <input className={inputCls} dir="ltr" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@kphfs.org" />
-            </Field>
-            <Field label={ar ? 'كلمة المرور' : 'Password'}>
-              <input className={inputCls} dir="ltr" type="password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
-            </Field>
-            {err && <p className="text-[13.5px] text-crescent">{err}</p>}
-            <Button className="w-full" onClick={submit}>
-              {ar ? 'دخول' : 'Sign in'}
-            </Button>
-          </div>
-          <div className="mt-8">
-            <div className="mb-2 text-[13px] text-muted">{ar ? 'للعرض: ادخل مباشرة بأحد المستخدمين' : 'Demo: sign in directly as one of the users'}</div>
-            <div className="grid max-h-[340px] gap-2 overflow-y-auto sm:grid-cols-2">
+          <div className="mt-5">
+            <div className="mb-2 text-[13px] text-muted">{ar ? 'اضغط على دورك للدخول مباشرة' : 'Press your role to sign in'}</div>
+            <div className="grid gap-2 sm:grid-cols-2">
               {users
                 .filter((u) => u.active !== false)
                 .map((u) => (
-                  <button key={u.id} onClick={() => signIn(u.id)} className="flex items-center gap-2.5 rounded-md border border-line bg-surface p-2.5 text-start hover:border-nile-2">
+                  <button key={u.id} onClick={() => signIn(u.id)} className="flex items-center gap-2.5 rounded-md border border-line bg-surface p-3 text-start hover:border-nile-2 hover:bg-nile-soft/40">
                     <span className="grid size-8 shrink-0 place-items-center rounded bg-nile-soft font-kufi text-[11.5px] font-semibold text-nile">{initialsOf(u.name[lang])}</span>
                     <span className="min-w-0 leading-tight">
                       <span className="block truncate text-[13px] font-medium">{roles.find((r) => r.id === u.role)?.name[lang]}</span>
@@ -81,6 +69,19 @@ export function Login() {
                   </button>
                 ))}
             </div>
+          </div>
+          <div className="mt-8 space-y-4 border-t border-line pt-6">
+            <div className="text-[13px] text-muted">{ar ? 'أو ادخل بالبريد وكلمة المرور' : 'Or sign in with email and password'}</div>
+            <Field label={ar ? 'البريد الإلكتروني' : 'Email'}>
+              <input className={inputCls} dir="ltr" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@kphfs.org" />
+            </Field>
+            <Field label={ar ? 'كلمة المرور' : 'Password'}>
+              <input className={inputCls} dir="ltr" type="password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
+            </Field>
+            {err && <p className="text-[13.5px] text-crescent">{err}</p>}
+            <Button className="w-full" onClick={submit}>
+              {ar ? 'دخول' : 'Sign in'}
+            </Button>
           </div>
         </div>
       </div>
