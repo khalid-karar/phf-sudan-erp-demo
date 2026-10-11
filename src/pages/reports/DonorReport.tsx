@@ -19,7 +19,8 @@ export function DonorReport() {
   const ar = lang === 'ar'
   const s = useStore()
   const { can, user } = usePerm()
-  const [pid, setPid] = useState(s.projects[0].id)
+  const projects = user.donorId ? s.projects.filter((x) => x.donorId === user.donorId) : s.projects
+  const [pid, setPid] = useState((projects[0] ?? s.projects[0]).id)
   const [span, setSpan] = useState<'month' | 'quarter' | 'todate'>('quarter')
   const [period, setPeriod] = useState(lastMonth())
   const [rLang, setRLang] = useState<Lang>('ar')
@@ -88,7 +89,7 @@ export function DonorReport() {
       <div className="mb-5 flex flex-wrap items-end gap-4">
         <Field label={ar ? 'المشروع' : 'Project'}>
           <select className="h-10 rounded-md border border-line bg-surface px-2 text-[14px]" value={pid} onChange={(e) => setPid(e.target.value)}>
-            {s.projects.map((x) => (
+            {projects.map((x) => (
               <option key={x.id} value={x.id}>
                 {x.code} — {x.name[lang]}
               </option>

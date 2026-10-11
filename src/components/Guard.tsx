@@ -1,13 +1,15 @@
 import { Lock } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import type { Access, ModuleKey } from '../data/types'
 import { locate } from '../lib/nav'
 import { useStore, usePerm } from '../lib/store'
+import { useVisibleNav } from './Layout'
 
 /** Shows the page only when the user's role allows it; otherwise explains why and who can help. */
 export function Guard({ children }: { children: ReactNode }) {
-  const { can, role } = usePerm()
+  const { can, role, user } = usePerm()
+  const visible = useVisibleNav()
   const lang = useStore((s) => s.lang)
   const users = useStore((s) => s.users)
   const loc = useLocation()
@@ -15,7 +17,11 @@ export function Guard({ children }: { children: ReactNode }) {
   if (!here) return <>{children}</>
   const m = here.module.key as ModuleKey
   const min: Access = here.item.min ?? 'view'
-  if (can(m, min)) return <>{children}</>
+  const donorBlocked = !!user.donorId && !here.item.donorOk
+  if (can(m, min) && !donorBlocked) return <>{children}</>
+  // The landing page isn't open to this role (e.g. a donor representative): go to the first page that is.
+  const first = visible[0]?.items[0]?.to
+  if (loc.pathname === '/' && first && first !== '/') return <Navigate to={first} replace />
   const admins = users.filter((u) => u.role === 'admin' && u.active !== false)
   const ar = lang === 'ar'
   return (
