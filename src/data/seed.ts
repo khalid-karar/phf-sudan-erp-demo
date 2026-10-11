@@ -202,7 +202,7 @@ export const roles: Role[] = [
     id: 'donor_viewer',
     name: { ar: 'ممثل الجهة المانحة (عرض فقط)', en: 'Donor representative (view only)' },
     description: { ar: 'يرى التقارير التي أُفرج عنها لجهته فقط', en: 'Sees only the reports released to their own donor' },
-    permissions: perms({ dashboard: 'none', alerts: 'none' }),
+    permissions: perms({ dashboard: 'none', alerts: 'none', reports: 'view' }),
     scope: 'all',
     canApprove: false,
     system: true,
@@ -260,6 +260,7 @@ const pillar = (projectId: string, n: number, ar: string, en: string, lines: L[]
 export const projects: Project[] = [
   {
     id: 'pa',
+    donorId: 'don-a',
     code: 'PRJ-A',
     name: { ar: 'مشروع دعم الرعاية الصحية — شرق السودان', en: 'Health Care Support — Eastern Sudan' },
     donor: { ar: 'مانح (أ) — بيانات تجريبية', en: 'Donor A (sample)' },
@@ -321,6 +322,7 @@ export const projects: Project[] = [
   },
   {
     id: 'pb',
+    donorId: 'don-b',
     code: 'PRJ-B',
     name: { ar: 'مشروع التغذية العلاجية — شمال دارفور', en: 'Therapeutic Nutrition — North Darfur' },
     donor: { ar: 'مانح (ب) — بيانات تجريبية', en: 'Donor B (sample)' },

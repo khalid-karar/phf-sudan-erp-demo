@@ -93,6 +93,7 @@ export interface Project {
   code: string
   name: Bi
   donor: Bi
+  donorId?: string // links the project to a donor representative login
   fundId: string
   start: string
   end: string

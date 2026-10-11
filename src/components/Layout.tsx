@@ -52,13 +52,13 @@ const rank: Record<Access, number> = { none: 0, view: 1, edit: 2, manage: 3 }
 
 /** Modules and pages the current user is allowed to see. */
 export function useVisibleNav() {
-  const { role } = usePerm()
+  const { role, user } = usePerm()
   return modules
     .map((m) => {
       if (!role) return null
       const level = role.permissions[m.key as ModuleKey]
       if (rank[level] < 1) return null
-      const items = m.items.filter((it) => rank[level] >= rank[it.min ?? 'view'])
+      const items = m.items.filter((it) => rank[level] >= rank[it.min ?? 'view'] && (!user.donorId || it.donorOk))
       return items.length ? { ...m, items } : null
     })
     .filter(Boolean) as NavModule[]
